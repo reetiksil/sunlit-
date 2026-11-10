@@ -55,14 +55,9 @@ export function AmbientAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // Automatically turn off ambient sound when entering reading mode
+  // Close sound dropdown menu if open when entering reading mode (audio continues playing peacefully)
   useEffect(() => {
     if (readerMode) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setIsPlaying(false);
-      setActiveSound("none");
       setIsOpen(false);
     }
   }, [readerMode]);

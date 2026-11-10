@@ -191,81 +191,86 @@ export default function ChapterReaderPage() {
         isDark={isNight}
       />
 
-      {showChrome && (
-        <div className="fixed left-0 right-0 top-0 z-50 h-1" style={{ background: "var(--reader-border)" }}>
-          <div
-            className="h-full bg-primary transition-[width] duration-150"
-            style={{ width: `${scrollProgress}%` }}
-            role="progressbar"
-            aria-valuenow={scrollProgress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Chapter reading progress"
-          />
-        </div>
-      )}
+      <div
+        className={`fixed left-0 right-0 top-0 z-50 h-1 transition-opacity duration-300 ${
+          showChrome ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        style={{ background: "var(--reader-border)" }}
+      >
+        <div
+          className="h-full bg-primary transition-[width] duration-150"
+          style={{ width: `${scrollProgress}%` }}
+          role="progressbar"
+          aria-valuenow={scrollProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Chapter reading progress"
+        />
+      </div>
 
-      {showChrome && (
-        <header
-          className={`fixed left-0 right-0 top-1 z-40 px-3 transition-all duration-300 ${
-            controlsVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-20 opacity-0"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
+      {/* Reader Header (kept mounted so AmbientAudio and BedtimeWarmth persist during reading mode) */}
+      <header
+        className={`fixed left-0 right-0 top-1 z-40 px-3 transition-all duration-300 ${
+          showChrome && controlsVisible
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-20 opacity-0"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        aria-hidden={!showChrome || !controlsVisible}
+      >
+        <div
+          className="mx-auto mt-2 flex max-w-4xl items-center justify-between rounded-full border px-3 py-1.5 shadow-calm backdrop-blur-md"
+          style={{ backgroundColor: "var(--reader-surface)", borderColor: "var(--reader-border)" }}
         >
-          <div
-            className="mx-auto mt-2 flex max-w-4xl items-center justify-between rounded-full border px-3 py-1.5 shadow-calm backdrop-blur-md"
-            style={{ backgroundColor: "var(--reader-surface)", borderColor: "var(--reader-border)" }}
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <Link href={`/book/${params.slug}`} aria-label="Back to book details" className="reader-icon-btn">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <div className="min-w-0">
-                <p className="truncate text-xs opacity-75">{data?.book.title}</p>
-                <p className="truncate font-serif text-sm font-semibold">
-                  {data ? `Ch. ${chapterNumber}: ${data.chapter.title}` : "Loading…"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <AmbientAudio />
-              <BedtimeWarmth />
-              <button
-                type="button"
-                onClick={() => setChaptersOpen((o) => !o)}
-                aria-label="Open chapter list"
-                aria-expanded={chaptersOpen}
-                className="reader-icon-btn"
-              >
-                <List className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="Open reader appearance settings"
-                className="reader-icon-btn"
-              >
-                <Settings2 className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={toggleDayNight}
-                aria-label={isNight ? "Switch to Day reading mode" : "Switch to Night reading mode"}
-                title={isNight ? "Switch to Day reading mode" : "Switch to Night reading mode"}
-                className="reader-icon-btn"
-              >
-                {isNight ? (
-                  <Moon className="h-5 w-5 text-primary" />
-                ) : (
-                  <Sun className="h-5 w-5 text-amber-600" />
-                )}
-              </button>
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href={`/book/${params.slug}`} aria-label="Back to book details" className="reader-icon-btn">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <div className="min-w-0">
+              <p className="truncate text-xs opacity-75">{data?.book.title}</p>
+              <p className="truncate font-serif text-sm font-semibold">
+                {data ? `Ch. ${chapterNumber}: ${data.chapter.title}` : "Loading…"}
+              </p>
             </div>
           </div>
-        </header>
-      )}
+
+          <div className="flex items-center gap-1.5">
+            <AmbientAudio />
+            <BedtimeWarmth />
+            <button
+              type="button"
+              onClick={() => setChaptersOpen((o) => !o)}
+              aria-label="Open chapter list"
+              aria-expanded={chaptersOpen}
+              className="reader-icon-btn"
+            >
+              <List className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Open reader appearance settings"
+              className="reader-icon-btn"
+            >
+              <Settings2 className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleDayNight}
+              aria-label={isNight ? "Switch to Day reading mode" : "Switch to Night reading mode"}
+              title={isNight ? "Switch to Day reading mode" : "Switch to Night reading mode"}
+              className="reader-icon-btn"
+            >
+              {isNight ? (
+                <Moon className="h-5 w-5 text-primary" />
+              ) : (
+                <Sun className="h-5 w-5 text-amber-600" />
+              )}
+            </button>
+          </div>
+        </div>
+      </header>
 
       <main
         id="chapter-text"
