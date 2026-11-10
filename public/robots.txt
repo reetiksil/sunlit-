@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://sunlitpages.example.com/sitemap.xmlUser-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://sunlitpages.example.com/sitemap.xml
