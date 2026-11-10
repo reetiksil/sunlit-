@@ -1,13 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Moon, Sun } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function BedtimeWarmth() {
-  const [warmth, setWarmth] = useState(0); // 0 to 45%
+  const [warmth, setWarmth] = useState(0); // 0 to 40%
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem("sunlit_bedtime_warmth");
     if (saved) {
       const val = parseInt(saved, 10);
@@ -20,20 +25,25 @@ export function BedtimeWarmth() {
     localStorage.setItem("sunlit_bedtime_warmth", val.toString());
   };
 
+  const isDark = resolvedTheme === "dark";
+
   return (
     <>
-      {/* Amber Candlelight Screen Filter Overlay */}
-      {warmth > 0 && (
-        <div
-          className="fixed inset-0 pointer-events-none z-[999] transition-opacity duration-300"
-          style={{
-            backgroundColor: "#FF9A3C",
-            opacity: warmth / 100,
-            mixBlendMode: "multiply",
-          }}
-          aria-hidden="true"
-        />
-      )}
+      {/* Amber Candlelight Screen Filter Overlay - Portaled directly to body to cover full viewport */}
+      {mounted &&
+        warmth > 0 &&
+        createPortal(
+          <div
+            className="fixed inset-0 pointer-events-none z-[9999] transition-opacity duration-300"
+            style={{
+              backgroundColor: "#FF9A3C",
+              opacity: isDark ? (warmth / 100) * 0.45 : (warmth / 100) * 0.72,
+              mixBlendMode: isDark ? "screen" : "multiply",
+            }}
+            aria-hidden="true"
+          />,
+          document.body
+        )}
 
       <div className="relative inline-block text-left">
         <button

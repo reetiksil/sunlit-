@@ -293,7 +293,15 @@ html[data-reader-mode="on"] .site-header,
 html[data-reader-mode="on"] .site-footer,
 html[data-reader-mode="on"] .ambient-bg,
 html[data-reader-mode="on"] body::before { display: none !important; }
-html[data-reader-mode="on"] body { background: var(--reader-bg, var(--bg)); }
+html[data-reader-mode="on"] body,
+html[data-reader-theme] body {
+  background: var(--reader-bg, var(--bg));
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+.reader-shell {
+  transition: background-color 300ms ease, color 300ms ease;
+}
 
 [data-reader-theme="day"] { --reader-bg: #FCF9F2; --reader-surface: #FFFFFF; --reader-text: #182230; --reader-muted: #4B5563; --reader-border: #E8DEC8; }
 [data-reader-theme="sepia"] { --reader-bg: #F5EEDB; --reader-surface: #EDE2CA; --reader-text: #2D2115; --reader-muted: #5E4A35; --reader-border: #DFD0AF; }

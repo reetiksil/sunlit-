@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { RotateCcw, X } from "lucide-react";
+import { RotateCcw, X, Maximize2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useReaderStore } from "@/stores/useReaderStore";
 import {
@@ -99,19 +99,35 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
   const { setTheme } = useTheme();
   const panelRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Trap focus and handle Escape key without re-focusing on every re-render
   useEffect(() => {
-    if (!open) return;
-    returnFocusRef.current = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    panel?.querySelector<HTMLElement>("button, input")?.focus();
+    if (!open) {
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        returnFocusRef.current?.focus?.();
+      }
+      return;
+    }
+
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      returnFocusRef.current = document.activeElement as HTMLElement | null;
+      // Focus initial button with preventScroll to prevent drawer jumping
+      const panel = panelRef.current;
+      panel?.querySelector<HTMLElement>("button, input")?.focus({ preventScroll: true });
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
+      const panel = panelRef.current;
       if (e.key !== "Tab" || !panel) return;
       const focusable = panel.querySelectorAll<HTMLElement>("button:not([disabled]), input, [href]");
       if (!focusable.length) return;
@@ -128,9 +144,8 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      returnFocusRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const L = READER_LIMITS;
@@ -219,22 +234,13 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
           <Segmented label="Column width" value={settings.contentWidth} options={WIDTHS}
             onChange={(v) => updateSettings({ contentWidth: v })} />
 
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border p-4">
-            <div>
-              <p id="rm-label" className="text-sm font-semibold">Reader mode</p>
-              <p id="rm-desc" className="text-xs text-text-muted">Hide menus and footers for a quiet page.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={settings.readerMode}
-              aria-labelledby="rm-label"
-              aria-describedby="rm-desc"
-              onClick={() => updateSettings({ readerMode: !settings.readerMode })}
-              className="switch"
-            >
-              <span className="switch-thumb" />
-            </button>
+          <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 text-xs text-text-muted space-y-1">
+            <p className="font-semibold text-text flex items-center gap-1.5 text-sm">
+              <Maximize2 className="h-4 w-4 text-primary" /> Full-Screen Reader Mode
+            </p>
+            <p className="leading-relaxed">
+              Double-click anywhere on the reading page to enter or exit distraction-free full screen mode (or press <kbd className="rounded border border-border bg-surface px-1 py-0.5 font-mono text-[10px]">Esc</kbd>).
+            </p>
           </div>
 
           <p className="rounded-2xl border border-border p-4 text-text-muted" style={{

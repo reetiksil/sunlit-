@@ -32,7 +32,7 @@ export const bookSchema = z.object({
 export const chapterSchema = z.object({
   id: z.string().min(1).max(80),
   bookId: z.string().min(1).max(80),
-  number: z.number().int().min(1).max(10000),
+  number: z.number().int().min(0).max(10000),
   title: z.string().trim().min(1).max(200),
   content: z.array(z.string().max(20000)).max(2000),
   wordCount: z.number().int().min(0),

@@ -88,10 +88,13 @@ export function deleteChapter(bookId: string, chapterId: string): Promise<void> 
   return mutate((s) => {
     const book = s.books.find((b) => b.id === bookId);
     if (!book) throw new Error("Book not found.");
-    const list = (s.chapters[bookId] ?? []).filter((c) => c.id !== chapterId);
-    // Renumber remaining chapters sequentially
+    const existing = s.chapters[bookId] ?? [];
+    const startsWithZero = existing.some((c) => c.number === 0);
+    const list = existing.filter((c) => c.id !== chapterId);
+    // Renumber remaining chapters sequentially, preserving 0-start if present
+    const baseNumber = startsWithZero ? 0 : 1;
     list.forEach((c, idx) => {
-      c.number = idx + 1;
+      c.number = idx + baseNumber;
     });
     s.chapters[bookId] = list;
     book.chapterCount = list.length;
@@ -104,19 +107,21 @@ export function reorderChapters(bookId: string, chapterIds: string[]): Promise<C
     const book = s.books.find((b) => b.id === bookId);
     if (!book) throw new Error("Book not found.");
     const currentList = s.chapters[bookId] ?? [];
+    const startsWithZero = currentList.some((c) => c.number === 0);
+    const baseNumber = startsWithZero ? 0 : 1;
     const map = new Map(currentList.map((c) => [c.id, c]));
     const reordered: Chapter[] = [];
     chapterIds.forEach((id, index) => {
       const ch = map.get(id);
       if (ch) {
-        ch.number = index + 1;
+        ch.number = index + baseNumber;
         reordered.push(ch);
         map.delete(id);
       }
     });
     // Append any omitted chapters at the end
     for (const remaining of map.values()) {
-      remaining.number = reordered.length + 1;
+      remaining.number = reordered.length + baseNumber;
       reordered.push(remaining);
     }
     s.chapters[bookId] = reordered;

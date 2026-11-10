@@ -622,10 +622,13 @@ export default function AdminDashboardPage() {
                 <label className="label">Chapter #</label>
                 <input
                   type="number"
-                  min={1}
+                  min={0}
                   className="input"
                   value={chapterNumber}
-                  onChange={(e) => setChapterNumber(Math.max(1, Number(e.target.value) || 1))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setChapterNumber(Number.isInteger(val) && val >= 0 ? val : 0);
+                  }}
                 />
               </div>
             </div>

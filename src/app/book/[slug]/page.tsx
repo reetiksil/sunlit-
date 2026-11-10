@@ -70,7 +70,8 @@ export default function BookDetailPage() {
 
   const bookProgress = progress[book.id];
   const currentShelf = shelf[book.id];
-  const continueChapter = bookProgress?.lastChapter ?? 1;
+  const firstChapterNumber = chapters.length > 0 ? chapters[0].number : 1;
+  const continueChapter = bookProgress?.lastChapter ?? firstChapterNumber;
 
   const filteredChapters = chapters
     .filter(
@@ -161,7 +162,7 @@ export default function BookDetailPage() {
               <BookOpen className="h-4 w-4" />
               {bookProgress
                 ? `Continue from Chapter ${continueChapter}`
-                : "Start Reading Chapter 1"}
+                : `Start Reading Chapter ${firstChapterNumber}`}
             </Link>
 
             <BookshelfSelector value={currentShelf ?? null} onChange={(c) => setShelfCategory(book.id, c)} />
