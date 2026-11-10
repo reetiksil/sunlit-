@@ -8,14 +8,15 @@ export type GenreSlug =
   | "mystery"
   | "adventure"
   | "historical"
-  | "cozy";
+  | "cozy"
+  | (string & {});
 
 export interface Genre {
   id: string;
-  slug: GenreSlug;
+  slug: string;
   name: string;
   description: string;
-  colorToken: "sky" | "mint" | "blush" | "primary";
+  colorToken?: "sky" | "mint" | "blush" | "primary";
 }
 
 export interface CoverStyle {
@@ -111,7 +112,21 @@ export interface User {
   email: string;
   role: "reader" | "admin";
   isVerified?: boolean;
+  isBanned?: boolean;
   joinedAt: string;
+}
+
+export interface Review {
+  id: string;
+  bookId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  rating: number; // 1 to 5
+  title?: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BookRequest {
@@ -129,6 +144,7 @@ export interface BookRequest {
 
 export interface BookFilterParams {
   query?: string;
+  author?: string;
   genres?: GenreSlug[];
   status?: BookStatus | "all";
   sort?: "popular" | "newest" | "rating" | "az";

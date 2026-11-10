@@ -76,11 +76,12 @@ export function ReaderBlocks({ blocks, settings }: { blocks: Block[]; settings: 
         return (
           <p
             key={i}
-            className="leading-relaxed"
+            className="leading-relaxed whitespace-pre-line"
             style={{
               marginBottom: gap,
               textAlign: settings.textAlign,
               color: "var(--reader-text)",
+              whiteSpace: "pre-line",
             }}
           >
             {b.text}

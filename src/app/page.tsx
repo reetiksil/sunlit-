@@ -19,6 +19,29 @@ import { SvgCover } from "@/components/book/SvgCover";
 import { BookCard } from "@/components/book/BookCard";
 import { useBookshelfStore } from "@/stores/useBookshelfStore";
 
+function formatRelativeTime(dateString: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    if (isNaN(diffMs)) return "recently";
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay === 1) return "yesterday";
+    if (diffDay < 7) return `${diffDay}d ago`;
+    const diffWeek = Math.floor(diffDay / 7);
+    if (diffWeek < 4) return `${diffWeek}w ago`;
+    const diffMonth = Math.floor(diffDay / 30);
+    if (diffMonth < 12) return `${diffMonth}mo ago`;
+    return `${Math.floor(diffDay / 365)}y ago`;
+  } catch {
+    return "recently";
+  }
+}
+
 export default function HomePage() {
   const { data: books = [], isLoading } = useQuery({
     queryKey: ["books-all"],
@@ -51,13 +74,22 @@ export default function HomePage() {
     }))
     .filter((item) => item.book !== undefined);
 
-  const popularBooks = books
-    .filter((b) => b.weeklyRank !== undefined)
-    .sort((a, b) => (a.weeklyRank ?? 99) - (b.weeklyRank ?? 99));
+  // Real calculations based on actual view counts, timestamps, and status
+  const popularBooks = [...books]
+    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+    .slice(0, 6);
 
-  const completedBooks = books.filter((b) => b.status === "completed").slice(0, 6);
-  const newArrivals = [...books]
+  const completedBooks = [...books]
+    .filter((b) => b.status === "completed")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 6);
+
+  const recentlyAddedBooks = [...books]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 6);
+
+  const latestQuietUpdates = [...books]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 6);
 
   return (
@@ -284,30 +316,63 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. Latest Chapter Updates & Upload Call-to-Action */}
+      {/* 5. Recently Added Books to the Sanctuary */}
+      <section aria-labelledby="recently-added-heading" className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 id="recently-added-heading" className="font-serif text-fluid-h2 font-semibold text-text">
+              Recently Added Books
+            </h2>
+            <p className="text-xs text-text-muted">Fresh story acquisitions and newly transcribed manuscripts.</p>
+          </div>
+          <Link href="/browse?sort=newest" className="text-sm font-medium text-text-muted hover:text-text">
+            Explore All →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {recentlyAddedBooks.map((book) => (
+            <BookCard key={book.id} book={book} />
+          ))}
+        </div>
+      </section>
+
+      {/* 6. Latest Chapter Updates & Upload Call-to-Action */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <section aria-labelledby="updates-heading" className="space-y-4 lg:col-span-8">
-          <h2 id="updates-heading" className="font-serif text-fluid-h2 font-semibold">
-            Latest Quiet Updates
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 id="updates-heading" className="font-serif text-fluid-h2 font-semibold">
+              Latest Quiet Updates
+            </h2>
+            <span className="text-xs text-text-muted">Live curated timeline</span>
+          </div>
           <div className="divide-y divide-border rounded-3xl border border-border bg-surface p-2 shadow-calm">
-            {books.slice(0, 6).map((book, idx) => (
-              <Link
+            {latestQuietUpdates.map((book) => (
+              <div
                 key={book.id}
-                href={`/book/${book.slug}/chapter/${book.chapterCount}`}
-                className="flex items-center justify-between gap-4 rounded-2xl p-3.5 hover:bg-surface-soft"
+                className="flex items-center justify-between gap-4 rounded-2xl p-3.5 hover:bg-surface-soft transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-serif text-base font-medium text-text">{book.title}</p>
-                  <p className="text-xs text-text-muted">
-                    Chapter {book.chapterCount} · By {book.author}
+                  <Link
+                    href={`/book/${book.slug}/chapter/${book.chapterCount}`}
+                    className="truncate font-serif text-base font-medium text-text hover:text-primary block"
+                  >
+                    {book.title}
+                  </Link>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Chapter {book.chapterCount} · By{" "}
+                    <Link
+                      href={`/browse?author=${encodeURIComponent(book.author)}`}
+                      className="hover:text-primary hover:underline font-medium"
+                    >
+                      {book.author}
+                    </Link>
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-soft px-3 py-1 text-xs text-text-muted">
-                  <Clock className="h-3 w-3" />
-                  {idx + 1}h ago
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-surface-soft border border-border/60 px-3 py-1 text-xs text-text-muted font-medium">
+                  <Clock className="h-3 w-3 text-primary" />
+                  {formatRelativeTime(book.updatedAt)}
                 </span>
-              </Link>
+              </div>
             ))}
           </div>
         </section>
@@ -335,11 +400,19 @@ export default function HomePage() {
         </aside>
       </div>
 
-      {/* 6. Recently Completed & New Arrivals */}
+      {/* 7. Recently Completed Stories */}
       <section aria-labelledby="completed-heading" className="space-y-5">
-        <h2 id="completed-heading" className="font-serif text-fluid-h2 font-semibold">
-          Recently Completed Stories
-        </h2>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 id="completed-heading" className="font-serif text-fluid-h2 font-semibold">
+              Recently Completed Stories
+            </h2>
+            <p className="text-xs text-text-muted">Finished sagas ready for an uninterrupted, peaceful read from beginning to end.</p>
+          </div>
+          <Link href="/browse?status=completed" className="text-sm font-medium text-text-muted hover:text-text">
+            Explore All →
+          </Link>
+        </div>
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {completedBooks.map((book) => (
             <BookCard key={book.id} book={book} />

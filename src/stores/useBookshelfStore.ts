@@ -14,11 +14,26 @@ interface BookshelfState {
     totalChapters: number;
     scrollPercentage: number;
   }) => void;
+  syncWithServer: () => Promise<void>;
+}
+
+let syncTimeout: NodeJS.Timeout | null = null;
+function scheduleServerSync(shelf: Record<string, ShelfCategory>, progress: Record<string, ReadingProgress>) {
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(async () => {
+    try {
+      await fetch("/api/user/bookshelf", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shelf, progress }),
+      });
+    } catch {}
+  }, 1000);
 }
 
 export const useBookshelfStore = create<BookshelfState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       shelf: {
         "book-1": "reading",
         "book-2": "completed",
@@ -35,11 +50,26 @@ export const useBookshelfStore = create<BookshelfState>()(
           updatedAt: new Date().toISOString(),
         },
       },
+      syncWithServer: async () => {
+        try {
+          const res = await fetch("/api/user/bookshelf");
+          if (res.ok) {
+            const data = await res.json();
+            if (data && (Object.keys(data.shelf || {}).length > 0 || Object.keys(data.progress || {}).length > 0)) {
+              set((state) => ({
+                shelf: { ...state.shelf, ...data.shelf },
+                progress: { ...state.progress, ...data.progress },
+              }));
+            }
+          }
+        } catch {}
+      },
       setShelfCategory: (bookId, category) =>
         set((state) => {
           const next = { ...state.shelf };
           if (!category) delete next[bookId];
           else next[bookId] = category;
+          scheduleServerSync(next, state.progress);
           return { shelf: next };
         }),
       updateProgress: ({ bookId, bookSlug, chapterNumber, totalChapters, scrollPercentage }) =>
@@ -48,23 +78,28 @@ export const useBookshelfStore = create<BookshelfState>()(
           const readSet = new Set(existing?.readChapters ?? []);
           readSet.add(chapterNumber);
 
+          const nextShelf = {
+            ...state.shelf,
+            [bookId]: state.shelf[bookId] ?? "reading",
+          };
+          const nextProgress = {
+            ...state.progress,
+            [bookId]: {
+              bookId,
+              bookSlug,
+              lastChapter: chapterNumber,
+              totalChapters,
+              scrollPercentage,
+              readChapters: Array.from(readSet),
+              updatedAt: new Date().toISOString(),
+            },
+          };
+
+          scheduleServerSync(nextShelf, nextProgress);
+
           return {
-            shelf: {
-              ...state.shelf,
-              [bookId]: state.shelf[bookId] ?? "reading",
-            },
-            progress: {
-              ...state.progress,
-              [bookId]: {
-                bookId,
-                bookSlug,
-                lastChapter: chapterNumber,
-                totalChapters,
-                scrollPercentage,
-                readChapters: Array.from(readSet),
-                updatedAt: new Date().toISOString(),
-              },
-            },
+            shelf: nextShelf,
+            progress: nextProgress,
           };
         }),
     }),

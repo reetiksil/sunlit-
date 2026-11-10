@@ -29,16 +29,15 @@ export function BedtimeWarmth() {
 
   return (
     <>
-      {/* Amber Candlelight Screen Filter Overlay - Portaled directly to body to cover full viewport */}
+      {/* Amber Candlelight Screen Filter Overlay - Portaled directly to body to cover full viewport smoothly */}
       {mounted &&
         warmth > 0 &&
         createPortal(
           <div
             className="fixed inset-0 pointer-events-none z-[9999] transition-opacity duration-300"
             style={{
-              backgroundColor: "#FF9A3C",
-              opacity: isDark ? (warmth / 100) * 0.45 : (warmth / 100) * 0.72,
-              mixBlendMode: isDark ? "screen" : "multiply",
+              backgroundColor: isDark ? "#FFA726" : "#E68A00",
+              opacity: (warmth / 100) * (isDark ? 0.32 : 0.22),
             }}
             aria-hidden="true"
           />,
@@ -61,7 +60,7 @@ export function BedtimeWarmth() {
         </button>
 
         {isOpen && (
-          <div className="card absolute right-0 top-11 z-50 w-56 p-4 border border-border shadow-2xl space-y-3 animate-in fade-in zoom-in-95">
+          <div className="card fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 z-50 sm:w-56 max-w-[calc(100vw-2rem)] p-4 border border-border shadow-2xl space-y-3 animate-in fade-in zoom-in-95 bg-surface text-text rounded-2xl">
             <div className="flex items-center justify-between border-b border-border/60 pb-2">
               <span className="font-serif text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
                 <Moon className="h-3.5 w-3.5 text-amber-500" /> Bedtime Candlelight

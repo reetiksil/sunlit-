@@ -10,6 +10,7 @@ export interface StoredUser {
   role: Role;
   passwordHash: string;
   isVerified?: boolean;
+  isBanned?: boolean;
   joinedAt: string;
 }
 
@@ -19,11 +20,20 @@ export interface PublicUser {
   email: string;
   role: Role;
   isVerified: boolean;
+  isBanned: boolean;
   joinedAt: string;
 }
 
 export function toPublicUser(u: StoredUser): PublicUser {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, isVerified: !!u.isVerified, joinedAt: u.joinedAt };
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    isVerified: !!u.isVerified,
+    isBanned: !!u.isBanned,
+    joinedAt: u.joinedAt,
+  };
 }
 
 export function dataDir(): string {
@@ -232,5 +242,30 @@ export async function syncEnvAdmin(user: StoredUser): Promise<StoredUser> {
     users[idx] = { ...users[idx], role: "admin" };
     await writeUsers(users);
     return users[idx];
+  });
+}
+
+export async function banUser(id: string, isBanned: boolean): Promise<StoredUser | null> {
+  return serialize(async () => {
+    const users = await readUsers();
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx < 0) return null;
+    // Don't allow banning admins
+    if (users[idx].role === "admin") throw new Error("Cannot ban an administrator.");
+    users[idx].isBanned = isBanned;
+    await writeUsers(users);
+    return users[idx];
+  });
+}
+
+export async function deleteUser(id: string): Promise<boolean> {
+  return serialize(async () => {
+    const users = await readUsers();
+    const user = users.find((u) => u.id === id);
+    if (!user) return false;
+    if (user.role === "admin") throw new Error("Cannot delete an administrator account.");
+    const filtered = users.filter((u) => u.id !== id);
+    await writeUsers(filtered);
+    return true;
   });
 }

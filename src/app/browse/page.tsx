@@ -3,24 +3,27 @@
 import React, { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Search, SlidersHorizontal, X, BookOpen, Sparkles, BookPlus, RotateCcw } from "lucide-react";
+import { Search, SlidersHorizontal, X, BookOpen, Sparkles, BookPlus, RotateCcw, User } from "lucide-react";
 import { getBooks, getGenres } from "@/services/api";
 import { BookCard } from "@/components/book/BookCard";
 import { BookStatus, GenreSlug } from "@/types";
 import { RequestBookModal } from "@/components/book/RequestBookModal";
 import { ContinueReadingShelf } from "@/components/book/ContinueReadingShelf";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 function BrowseContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const initialQuery = searchParams.get("q") ?? "";
+  const initialAuthor = searchParams.get("author") ?? "";
   const initialGenres = (searchParams.get("genres")?.split(",").filter(Boolean) as GenreSlug[]) ?? [];
   const initialStatus = (searchParams.get("status") as BookStatus | "all") ?? "all";
   const initialSort =
     (searchParams.get("sort") as "popular" | "newest" | "rating" | "az") ?? "popular";
 
   const [query, setQuery] = useState(initialQuery);
+  const [author, setAuthor] = useState(initialAuthor);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
   const [selectedGenres, setSelectedGenres] = useState<GenreSlug[]>(initialGenres);
   const [status, setStatus] = useState<BookStatus | "all">(initialStatus);
@@ -28,6 +31,12 @@ function BrowseContent() {
   const [pageSize, setPageSize] = useState(12);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [requestModalOpen, setRequestModalOpen] = useState(false);
+
+  // Sync author if query param changes
+  useEffect(() => {
+    const currentAuthorParam = searchParams.get("author") ?? "";
+    setAuthor(currentAuthorParam);
+  }, [searchParams]);
 
   // Debounce search input
   useEffect(() => {
@@ -39,13 +48,14 @@ function BrowseContent() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim());
+    if (author.trim()) params.set("author", author.trim());
     if (selectedGenres.length > 0) params.set("genres", selectedGenres.join(","));
     if (status !== "all") params.set("status", status);
     if (sort !== "popular") params.set("sort", sort);
 
     const qs = params.toString();
     router.replace(qs ? `/browse?${qs}` : "/browse", { scroll: false });
-  }, [debouncedQuery, selectedGenres, status, sort, router]);
+  }, [debouncedQuery, author, selectedGenres, status, sort, router]);
 
   const { data: genres = [] } = useQuery({
     queryKey: ["genres"],
@@ -53,10 +63,11 @@ function BrowseContent() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["books-browse", debouncedQuery, selectedGenres, status, sort, pageSize],
+    queryKey: ["books-browse", debouncedQuery, author, selectedGenres, status, sort, pageSize],
     queryFn: () =>
       getBooks({
         query: debouncedQuery,
+        author: author || undefined,
         genres: selectedGenres,
         status,
         sort,
@@ -73,12 +84,15 @@ function BrowseContent() {
 
   const clearAllFilters = () => {
     setQuery("");
+    setAuthor("");
     setSelectedGenres([]);
     setStatus("all");
     setSort("popular");
   };
 
-  const hasActiveFilters = Boolean(query || selectedGenres.length > 0 || status !== "all" || sort !== "popular");
+  const hasActiveFilters = Boolean(
+    query || author || selectedGenres.length > 0 || status !== "all" || sort !== "popular"
+  );
 
   const FilterControls = () => (
     <div className="space-y-6">
@@ -146,17 +160,16 @@ function BrowseContent() {
           >
             Sort Collection
           </label>
-          <select
-            id="sort-select"
+          <CustomSelect
             value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            className="h-9 w-full rounded-xl border border-border/80 bg-surface px-3 text-xs font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            <option value="popular">Most Peaceful Reads</option>
-            <option value="newest">Recently Curated</option>
-            <option value="rating">Highest Acclaim</option>
-            <option value="az">Title (A – Z)</option>
-          </select>
+            onChange={(val) => setSort(val as typeof sort)}
+            options={[
+              { value: "popular", label: "Most Peaceful Reads" },
+              { value: "newest", label: "Recently Curated" },
+              { value: "rating", label: "Highest Acclaim" },
+              { value: "az", label: "Title (A – Z)" },
+            ]}
+          />
         </div>
       </div>
     </div>
@@ -223,6 +236,25 @@ function BrowseContent() {
         <div className="hidden sm:block">
           <FilterControls />
         </div>
+
+        {/* Active Author Pill */}
+        {author && (
+          <div className="flex items-center gap-2 pt-1 border-t border-border/40">
+            <span className="text-xs text-text-muted">Filtered by Author:</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/25 border border-primary/40 px-3 py-1 text-xs font-semibold text-text">
+              <User className="h-3.5 w-3.5 text-primary" />
+              {author}
+              <button
+                type="button"
+                onClick={() => setAuthor("")}
+                className="hover:text-primary hover:bg-primary/20 p-0.5 rounded-full"
+                aria-label="Clear author filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Filter Summary & Quick Reset */}
         {hasActiveFilters && (

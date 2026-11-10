@@ -1,5 +1,5 @@
 import { GENRES } from "@/data/seed";
-import { Book, BookFilterParams, BookRequest, Chapter, Genre, User } from "@/types";
+import { Book, BookFilterParams, BookRequest, Chapter, Genre, Review, User } from "@/types";
 
 export function filterAndSortBooks(books: Book[], filters?: BookFilterParams): Book[] {
   let result = [...books];
@@ -11,6 +11,13 @@ export function filterAndSortBooks(books: Book[], filters?: BookFilterParams): B
         b.title.toLowerCase().includes(q) ||
         b.author.toLowerCase().includes(q) ||
         b.blurb.toLowerCase().includes(q)
+    );
+  }
+
+  if (filters?.author && filters.author.trim() !== "") {
+    const authorQuery = filters.author.toLowerCase().trim();
+    result = result.filter(
+      (b) => b.author.toLowerCase() === authorQuery || b.author.toLowerCase().includes(authorQuery)
     );
   }
 
@@ -87,12 +94,59 @@ export async function searchBooks(query: string): Promise<Book[]> {
 }
 
 export async function getGenres(): Promise<Genre[]> {
+  try {
+    const res = await request<Genre[]>("/api/catalog/genres", { cache: "no-store" });
+    if (Array.isArray(res) && res.length > 0) return res;
+  } catch {
+    // fallback to static genres
+  }
   return GENRES;
 }
+
+export const createGenre = (genre: Genre) =>
+  request<Genre>("/api/catalog/genres", { method: "POST", body: JSON.stringify(genre) });
+
+export const deleteGenre = (slug: string) =>
+  request<{ ok: true }>(`/api/catalog/genres?slug=${encodeURIComponent(slug)}`, { method: "DELETE" });
+
+export const getReviews = (bookId: string) =>
+  request<Review[]>(`/api/catalog/books/${encodeURIComponent(bookId)}/reviews`, { cache: "no-store" });
+
+export const postReview = (bookId: string, data: { id?: string; rating: number; title?: string; content: string }) =>
+  request<Review>(`/api/catalog/books/${encodeURIComponent(bookId)}/reviews`, { method: "POST", body: JSON.stringify(data) });
+
+export const deleteReview = (bookId: string, reviewId: string) =>
+  request<{ ok: true }>(`/api/catalog/books/${encodeURIComponent(bookId)}/reviews?reviewId=${encodeURIComponent(reviewId)}`, {
+    method: "DELETE",
+  });
+
+export const recordBookView = (bookId: string) =>
+  request<{ ok: true; views: number }>(`/api/catalog/books/${encodeURIComponent(bookId)}/view`, { method: "POST" }).catch(
+    () => ({ ok: false, views: 0 })
+  );
 
 /* ---- admin-only (enforced server-side: these endpoints return 401/403 for non-admins) ---- */
 
 export const getUsers = () => request<User[]>("/api/admin/users", { cache: "no-store" });
+
+export const banUser = (userId: string, isBanned: boolean) =>
+  request<{ ok: true; isBanned: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ isBanned }),
+  });
+
+export const deleteUser = (userId: string) =>
+  request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
+
+export const getUserActivity = (userId: string) =>
+  request<{ reviews: Review[]; requests: BookRequest[] }>(`/api/admin/users/${encodeURIComponent(userId)}/activity`, {
+    cache: "no-store",
+  });
+
+export const clearAdminRequests = (onlyResolved = false) =>
+  request<{ ok: true; cleared: number }>(`/api/admin/requests${onlyResolved ? "?onlyResolved=true" : ""}`, {
+    method: "DELETE",
+  });
 
 export const upsertBook = (book: Book) =>
   request<Book>("/api/admin/books", { method: "POST", body: JSON.stringify(book) });

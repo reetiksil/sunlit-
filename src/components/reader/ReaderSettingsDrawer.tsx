@@ -100,8 +100,20 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
   const panelRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
+  const scrollPosRef = useRef(0);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+
+  // Preserve drawer scroll position across any setting changes/re-renders
+  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+    scrollPosRef.current = e.currentTarget.scrollTop;
+  };
+
+  useEffect(() => {
+    if (panelRef.current && scrollPosRef.current > 0) {
+      panelRef.current.scrollTop = scrollPosRef.current;
+    }
+  });
 
   // Trap focus and handle Escape key without re-focusing on every re-render
   useEffect(() => {
@@ -158,6 +170,7 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="reader-settings-title"
+        onScroll={handleScroll}
         onMouseDown={(e) => e.stopPropagation()}
         className="drawer-in max-h-[88vh] w-full overflow-y-auto rounded-t-3xl border border-border bg-surface p-6 text-text shadow-calm-hover sm:max-h-none sm:w-[24rem] sm:rounded-none sm:rounded-l-3xl"
       >

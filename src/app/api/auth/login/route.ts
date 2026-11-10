@@ -53,6 +53,10 @@ export async function POST(req: Request) {
 
   if (!found || !ok) return json({ error: "Invalid email or password." }, 401);
 
+  if (found.isBanned) {
+    return json({ error: "This community account has been suspended by the curator." }, 403);
+  }
+
   const user = await syncEnvAdmin(found);
   const publicUser = toPublicUser(user);
   const redirectUrl = user.role === "admin" ? "/admin" : null;

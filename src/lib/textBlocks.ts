@@ -152,7 +152,7 @@ export function parseTextToBlocks(input: string): Block[] {
 
 export function blocksFromParagraphs(paragraphs: string[]): Block[] {
   return paragraphs
-    .map((p) => p.replace(/[ \t]+/g, " ").trim())
+    .map((p) => p.trim())
     .filter(Boolean)
     .map((text) => ({ type: "paragraph" as const, text }));
 }

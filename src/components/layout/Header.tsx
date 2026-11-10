@@ -21,10 +21,19 @@ const NAV_LINKS = [
 function SunGlyph() {
   return (
     <svg
-      className="wordmark-sun h-7 w-7 text-primary shrink-0"
+      className="wordmark-sun h-7 w-7 text-primary shrink-0 inline-block"
       width={28}
       height={28}
-      style={{ width: 28, height: 28 }}
+      style={{
+        width: "28px",
+        height: "28px",
+        maxWidth: "28px",
+        maxHeight: "28px",
+        minWidth: "28px",
+        minHeight: "28px",
+        display: "inline-block",
+        flexShrink: 0,
+      }}
       viewBox="0 0 32 32"
       aria-hidden="true"
     >
@@ -131,14 +140,14 @@ export function Header() {
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
-          {isAdminPage ? (
+          {isAdmin ? (
             <>
-              <Link href="/" className="nav-link">Home</Link>
-              <Link href="/browse" className="nav-link">Catalog</Link>
+              <Link href="/" className="nav-link" aria-current={pathname === "/" ? "page" : undefined}>Home</Link>
+              <Link href="/browse" className="nav-link" aria-current={pathname === "/browse" ? "page" : undefined}>Catalog</Link>
               <Link
                 href="/admin"
                 className="nav-link inline-flex items-center gap-1.5 font-bold text-primary"
-                aria-current="page"
+                aria-current={pathname.startsWith("/admin") ? "page" : undefined}
               >
                 <Shield className="h-3.5 w-3.5" aria-hidden /> Curator Console
               </Link>
@@ -157,11 +166,6 @@ export function Header() {
               >
                 <BookPlus className="h-3.5 w-3.5 text-primary" aria-hidden /> Request a Book
               </button>
-              {isAdmin && (
-                <Link href="/admin" className="nav-link inline-flex items-center gap-1.5" aria-current={pathname.startsWith("/admin") ? "page" : undefined}>
-                  <Shield className="h-3.5 w-3.5" aria-hidden /> Curator studio
-                </Link>
-              )}
             </>
           )}
         </nav>
@@ -241,11 +245,11 @@ export function Header() {
               <input id="m-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitSearch()} placeholder="Search title or author" className="input rounded-full" />
             </div>
-            {isAdminPage ? (
+            {isAdmin ? (
               <>
-                <Link href="/" className="menu-item">Home</Link>
-                <Link href="/browse" className="menu-item">Catalog</Link>
-                <Link href="/admin" className="menu-item font-bold text-primary">
+                <Link href="/" className="menu-item" aria-current={pathname === "/" ? "page" : undefined}>Home</Link>
+                <Link href="/browse" className="menu-item" aria-current={pathname === "/browse" ? "page" : undefined}>Catalog</Link>
+                <Link href="/admin" className="menu-item font-bold text-primary" aria-current={pathname.startsWith("/admin") ? "page" : undefined}>
                   <span>Curator Console</span>
                   <Shield className="h-4 w-4" aria-hidden />
                 </Link>
@@ -266,7 +270,6 @@ export function Header() {
                   <span>Request a Book</span>
                   <BookPlus className="h-4 w-4 text-primary" aria-hidden />
                 </button>
-                {isAdmin && <Link href="/admin" className="menu-item"><span>Curator studio</span><Shield className="h-4 w-4" aria-hidden /></Link>}
               </>
             )}
             <div className="mt-2 flex gap-2 border-t border-border pt-3">

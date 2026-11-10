@@ -29,6 +29,14 @@ import {
   Upload,
   Image as ImageIcon,
   Check,
+  Tag,
+  Ban,
+  UserCheck,
+  UserX,
+  Star,
+  Layers,
+  MessageSquare,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import Link from "next/link";
@@ -44,8 +52,15 @@ import {
   getAdminRequests,
   updateBookRequestStatus,
   getGenres,
+  createGenre,
+  deleteGenre,
+  clearAdminRequests,
+  banUser,
+  deleteUser,
+  getUserActivity,
 } from "@/services/api";
-import { Book, Chapter, GenreSlug, BookRequest } from "@/types";
+import { Book, Chapter, GenreSlug, BookRequest, User, Genre, Review } from "@/types";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 const ANALYTICS_DATA = [
   { day: "Mon", reads: 3200 },
@@ -68,9 +83,17 @@ export default function AdminDashboardPage() {
   const { data: requests = [] } = useQuery({ queryKey: ["admin-requests"], queryFn: getAdminRequests, enabled: isAdmin });
   const { data: genres = [] } = useQuery({ queryKey: ["genres"], queryFn: getGenres });
 
-  const [tab, setTab] = useState<"overview" | "books" | "editor" | "requests" | "users">("overview");
+  const [tab, setTab] = useState<"overview" | "books" | "editor" | "requests" | "users" | "genres">("overview");
   const [search, setSearch] = useState("");
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Genre Management State
+  const [newGenreName, setNewGenreName] = useState("");
+  const [newGenreSlug, setNewGenreSlug] = useState("");
+  const [newGenreDesc, setNewGenreDesc] = useState("");
+
+  // User Profile Modal State
+  const [selectedUserForProfile, setSelectedUserForProfile] = useState<User | null>(null);
 
   // Book Form State (Create / Edit)
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
@@ -94,6 +117,13 @@ export default function AdminDashboardPage() {
     queryKey: ["admin-chapters", selectedBookId],
     queryFn: () => getChapters(selectedBookId),
     enabled: !!selectedBookId,
+  });
+
+  // Fetch activity for selected user in profile modal
+  const { data: userActivity, isLoading: isLoadingActivity } = useQuery({
+    queryKey: ["user-activity", selectedUserForProfile?.id],
+    enabled: !!selectedUserForProfile?.id,
+    queryFn: () => getUserActivity(selectedUserForProfile!.id),
   });
 
   const editor = useEditor({
@@ -160,6 +190,58 @@ export default function AdminDashboardPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
       setFlash({ kind: "ok", text: "Request status updated." });
+    },
+    onError,
+  });
+
+  const clearRequestsMutation = useMutation({
+    mutationFn: (onlyResolved?: boolean) => clearAdminRequests(onlyResolved),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
+      setFlash({ kind: "ok", text: `Cleared ${data.cleared} book requests.` });
+    },
+    onError,
+  });
+
+  const banUserMutation = useMutation({
+    mutationFn: ({ userId, isBanned }: { userId: string; isBanned: boolean }) => banUser(userId, isBanned),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      if (selectedUserForProfile && selectedUserForProfile.id === vars.userId) {
+        setSelectedUserForProfile({ ...selectedUserForProfile, isBanned: vars.isBanned });
+      }
+      setFlash({ kind: "ok", text: vars.isBanned ? "User account has been banned." : "User ban has been lifted." });
+    },
+    onError,
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => deleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setSelectedUserForProfile(null);
+      setFlash({ kind: "ok", text: "User account removed." });
+    },
+    onError,
+  });
+
+  const addGenreMutation = useMutation({
+    mutationFn: (genre: Genre) => createGenre(genre),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["genres"] });
+      setNewGenreName("");
+      setNewGenreSlug("");
+      setNewGenreDesc("");
+      setFlash({ kind: "ok", text: "New genre created successfully." });
+    },
+    onError,
+  });
+
+  const deleteGenreMutation = useMutation({
+    mutationFn: (slug: string) => deleteGenre(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["genres"] });
+      setFlash({ kind: "ok", text: "Genre removed." });
     },
     onError,
   });
@@ -299,6 +381,7 @@ export default function AdminDashboardPage() {
               { id: "editor", label: "Chapter Studio" },
               { id: "requests", label: "Requests", badge: pendingRequestsCount },
               { id: "users", label: "Users" },
+              { id: "genres", label: "Manage Genres" },
             ] as const
           ).map((item) => (
             <button
@@ -409,14 +492,14 @@ export default function AdminDashboardPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="field">
                 <label className="label">Status</label>
-                <select
+                <CustomSelect
                   value={bookStatus}
-                  onChange={(e) => setBookStatus(e.target.value as "ongoing" | "completed")}
-                  className="input"
-                >
-                  <option value="ongoing">Ongoing</option>
-                  <option value="completed">Completed</option>
-                </select>
+                  onChange={(val) => setBookStatus(val as "ongoing" | "completed")}
+                  options={[
+                    { value: "ongoing", label: "Ongoing" },
+                    { value: "completed", label: "Completed" },
+                  ]}
+                />
               </div>
               <div className="field">
                 <label className="label">Language</label>
@@ -602,21 +685,23 @@ export default function AdminDashboardPage() {
             <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
               <div className="field">
                 <label className="label">Target Book *</label>
-                <select
-                  className="input"
+                <CustomSelect
+                  searchable={true}
+                  placeholder="Search or choose a book…"
                   value={selectedBookId}
-                  onChange={(e) => {
-                    setSelectedBookId(e.target.value);
+                  onChange={(val) => {
+                    setSelectedBookId(val);
                     setEditingChapterId(null);
                   }}
-                >
-                  <option value="">Choose a book…</option>
-                  {books.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "Choose a book…" },
+                    ...books.map((b) => ({
+                      value: b.id,
+                      label: b.title,
+                      description: b.author,
+                    })),
+                  ]}
+                />
               </div>
               <div className="field">
                 <label className="label">Chapter #</label>
@@ -770,17 +855,49 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Book Requests Tab (Notifications, Review, Fulfill/Reject) */}
+      {/* Book Requests Tab (Notifications, Review, Fulfill/Reject & Clear) */}
       {tab === "requests" && (
         <div className="card p-6 space-y-5 border border-border shadow-sm">
-          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div>
               <h2 className="font-serif text-xl font-bold">Reader Book Requests</h2>
               <p className="text-xs text-text-muted">Review book proposals from verified readers.</p>
             </div>
-            <span className="text-xs px-3 py-1 rounded-full bg-primary/20 text-text font-semibold">
-              {pendingRequestsCount} Pending
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-3 py-1 rounded-full bg-primary/20 text-text font-semibold">
+                {pendingRequestsCount} Pending
+              </span>
+              {requests.length > 0 && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <button
+                    type="button"
+                    disabled={clearRequestsMutation.isPending}
+                    onClick={() => {
+                      if (window.confirm("Clear all fulfilled and rejected requests?")) {
+                        clearRequestsMutation.mutate(true);
+                      }
+                    }}
+                    className="btn btn-ghost btn-sm text-xs"
+                    title="Clear resolved requests"
+                  >
+                    Clear Resolved
+                  </button>
+                  <button
+                    type="button"
+                    disabled={clearRequestsMutation.isPending}
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to clear ALL requests?")) {
+                        clearRequestsMutation.mutate(false);
+                      }
+                    }}
+                    className="btn btn-danger btn-sm text-xs inline-flex items-center gap-1"
+                    title="Clear all requests"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Clear All
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {requests.length === 0 ? (
@@ -857,26 +974,311 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Users Tab */}
+      {/* Users Tab with Profile View, Ban, and Delete */}
       {tab === "users" && (
         <div className="card p-6 border border-border space-y-4">
-          <h2 className="font-serif text-xl font-bold">Registered Community Members ({users.length})</h2>
+          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+            <div>
+              <h2 className="font-serif text-xl font-bold">Registered Community Members ({users.length})</h2>
+              <p className="text-xs text-text-muted">Manage readers, inspect activity profiles, and handle moderation.</p>
+            </div>
+          </div>
           <div className="divide-y divide-border/60">
             {users.map((u) => (
-              <div key={u.id} className="flex items-center justify-between py-3 text-sm">
+              <div key={u.id} className="flex flex-wrap items-center justify-between py-3.5 text-sm gap-3">
                 <div>
-                  <p className="font-semibold">{u.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-text">{u.name}</p>
+                    {u.isBanned && (
+                      <span className="rounded-full bg-danger/20 border border-danger/40 px-2 py-0.5 text-[10px] font-bold text-danger">
+                        Banned
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-text-muted">{u.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-3 py-0.5 text-xs font-semibold capitalize ${
-                    u.role === "admin" ? "bg-primary text-primary-fg" : "bg-surface-soft text-text"
-                  }`}>
+                  <span
+                    className={`rounded-full px-3 py-0.5 text-xs font-semibold capitalize ${
+                      u.role === "admin" ? "bg-primary text-primary-fg" : "bg-surface-soft text-text"
+                    }`}
+                  >
                     {u.role}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserForProfile(u)}
+                    className="btn btn-ghost btn-sm text-xs inline-flex items-center gap-1.5"
+                  >
+                    <Users className="h-3.5 w-3.5 text-primary" /> View Profile & Activity
+                  </button>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Manage Genres Tab */}
+      {tab === "genres" && (
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          {/* Create New Genre */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newGenreName.trim()) return;
+              const slug = (newGenreSlug.trim() || newGenreName.trim().toLowerCase().replace(/\s+/g, "-")) as GenreSlug;
+              addGenreMutation.mutate({
+                id: `genre-${Date.now()}`,
+                name: newGenreName.trim(),
+                slug,
+                description: newGenreDesc.trim() || "Serene reading mood",
+                colorToken: "primary",
+              });
+            }}
+            className="card p-6 space-y-4 border border-border lg:col-span-5 shadow-sm"
+          >
+            <h2 className="font-serif text-xl font-bold flex items-center gap-2">
+              <Tag className="h-5 w-5 text-primary" /> Add New Genre / Mood
+            </h2>
+            <p className="text-xs text-text-muted">
+              Add new catalog filters and reading moods to the library filter salon.
+            </p>
+
+            <div className="field">
+              <label className="label">Genre Name *</label>
+              <input
+                type="text"
+                required
+                value={newGenreName}
+                onChange={(e) => setNewGenreName(e.target.value)}
+                placeholder="e.g. Historical Fiction"
+                className="input"
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">Genre Slug (optional URL identifier)</label>
+              <input
+                type="text"
+                value={newGenreSlug}
+                onChange={(e) => setNewGenreSlug(e.target.value)}
+                placeholder="e.g. historical-fiction"
+                className="input font-mono text-xs"
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">Description</label>
+              <textarea
+                rows={2}
+                value={newGenreDesc}
+                onChange={(e) => setNewGenreDesc(e.target.value)}
+                placeholder="A brief tranquil description of this mood…"
+                className="input py-2 h-auto resize-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={addGenreMutation.isPending || !newGenreName.trim()}
+              className="btn btn-primary w-full shadow-sm"
+            >
+              {addGenreMutation.isPending ? "Creating…" : "Add Genre to Catalog"}
+            </button>
+          </form>
+
+          {/* Existing Genres List */}
+          <div className="card p-6 space-y-4 border border-border lg:col-span-7 shadow-sm">
+            <h2 className="font-serif text-xl font-bold">Catalog Genres ({genres.length})</h2>
+            <div className="divide-y divide-border/60">
+              {genres.map((g) => (
+                <div key={g.id} className="flex items-center justify-between py-3 gap-2">
+                  <div>
+                    <p className="font-semibold text-sm text-text flex items-center gap-2">
+                      {g.name}
+                      <span className="font-mono text-[10px] text-text-muted bg-surface-soft px-2 py-0.5 rounded">
+                        /{g.slug}
+                      </span>
+                    </p>
+                    <p className="text-xs text-text-muted">{g.description}</p>
+                  </div>
+                  {/* Allow deleting custom genres */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Remove genre "${g.name}" from catalog filters?`)) {
+                        deleteGenreMutation.mutate(g.slug);
+                      }
+                    }}
+                    className="p-1.5 text-danger hover:bg-danger/10 rounded-lg"
+                    title="Remove Genre"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile & Activity Modal */}
+      {selectedUserForProfile && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          onClick={() => setSelectedUserForProfile(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl border border-border bg-surface p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-border/60 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif text-2xl font-bold text-text">{selectedUserForProfile.name}</h3>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
+                      selectedUserForProfile.role === "admin"
+                        ? "bg-primary text-primary-fg"
+                        : "bg-surface-soft text-text"
+                    }`}
+                  >
+                    {selectedUserForProfile.role}
+                  </span>
+                  {selectedUserForProfile.isBanned ? (
+                    <span className="rounded-full bg-danger/20 border border-danger/40 px-2 py-0.5 text-xs font-bold text-danger">
+                      Banned
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-accent-mint/30 px-2 py-0.5 text-xs font-medium text-text">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted mt-0.5">{selectedUserForProfile.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForProfile(null)}
+                className="text-text-muted hover:text-text p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Moderation Controls (Ban / Unban / Remove) */}
+            {selectedUserForProfile.role !== "admin" && (
+              <div className="rounded-2xl border border-border/70 bg-surface-soft/60 p-4 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-text">Account Moderation:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={banUserMutation.isPending}
+                    onClick={() =>
+                      banUserMutation.mutate({
+                        userId: selectedUserForProfile.id,
+                        isBanned: !selectedUserForProfile.isBanned,
+                      })
+                    }
+                    className={`btn btn-sm text-xs inline-flex items-center gap-1.5 ${
+                      selectedUserForProfile.isBanned
+                        ? "btn-primary"
+                        : "border border-amber-600/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                    }`}
+                  >
+                    {selectedUserForProfile.isBanned ? (
+                      <>
+                        <UserCheck className="h-3.5 w-3.5" /> Lift Ban
+                      </>
+                    ) : (
+                      <>
+                        <Ban className="h-3.5 w-3.5" /> Ban User
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={deleteUserMutation.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Permanently remove user "${selectedUserForProfile.name}"?`)) {
+                        deleteUserMutation.mutate(selectedUserForProfile.id);
+                      }
+                    }}
+                    className="btn btn-danger btn-sm text-xs inline-flex items-center gap-1.5"
+                  >
+                    <UserX className="h-3.5 w-3.5" /> Remove User
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* User Activity: Reviews & Book Requests */}
+            <div className="space-y-6">
+              {/* User Reviews */}
+              <div className="space-y-3">
+                <h4 className="font-serif text-base font-bold text-text flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  Reader Reflections & Reviews ({userActivity?.reviews.length ?? 0})
+                </h4>
+                {isLoadingActivity ? (
+                  <p className="text-xs text-text-muted">Loading activity…</p>
+                ) : !userActivity?.reviews.length ? (
+                  <p className="text-xs text-text-muted italic bg-surface-soft/40 p-3 rounded-xl border border-border/40">
+                    No book reflections submitted by this user yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {userActivity.reviews.map((rev) => (
+                      <div key={rev.id} className="rounded-xl border border-border/60 bg-surface-soft/30 p-3 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-text flex items-center gap-1">
+                            {"★".repeat(rev.rating)} {rev.title || "Reflection"}
+                          </span>
+                          <span className="text-text-muted text-[11px]">{new Date(rev.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-text-muted whitespace-pre-line">{rev.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* User Book Requests */}
+              <div className="space-y-3 border-t border-border/60 pt-4">
+                <h4 className="font-serif text-base font-bold text-text flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  Submitted Book Proposals ({userActivity?.requests.length ?? 0})
+                </h4>
+                {isLoadingActivity ? (
+                  <p className="text-xs text-text-muted">Loading proposals…</p>
+                ) : !userActivity?.requests.length ? (
+                  <p className="text-xs text-text-muted italic bg-surface-soft/40 p-3 rounded-xl border border-border/40">
+                    No book requests submitted by this user yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {userActivity.requests.map((req) => (
+                      <div key={req.id} className="rounded-xl border border-border/60 bg-surface-soft/30 p-3 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-text">
+                            {req.title} <span className="font-normal text-text-muted">by {req.author}</span>
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-soft border border-border/60">
+                            {req.status}
+                          </span>
+                        </div>
+                        {req.note && <p className="text-xs italic text-text-muted">&ldquo;{req.note}&rdquo;</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

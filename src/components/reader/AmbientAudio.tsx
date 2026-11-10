@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Volume2, VolumeX, CloudRain, Flame, Wind, Music, Play, Pause } from "lucide-react";
+import { useReaderStore } from "@/stores/useReaderStore";
 
 export type AmbientSoundId = "none" | "gentle-rain" | "heavy-rain" | "hearth" | "wind";
 
@@ -49,9 +50,22 @@ export function AmbientAudio() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.45);
   const [isOpen, setIsOpen] = useState(false);
+  const readerMode = useReaderStore((s) => s.settings.readerMode);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // Automatically turn off ambient sound when entering reading mode
+  useEffect(() => {
+    if (readerMode) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsPlaying(false);
+      setActiveSound("none");
+      setIsOpen(false);
+    }
+  }, [readerMode]);
 
   // Restore saved volume preference on mount
   useEffect(() => {
@@ -200,7 +214,7 @@ export function AmbientAudio() {
       </button>
 
       {isOpen && (
-        <div className="card absolute right-0 top-11 z-50 w-72 p-4 border border-border shadow-2xl space-y-4 animate-in fade-in zoom-in-95 bg-surface text-text rounded-2xl">
+        <div className="card fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 z-50 sm:w-72 max-w-[calc(100vw-2rem)] p-4 border border-border shadow-2xl space-y-4 animate-in fade-in zoom-in-95 bg-surface text-text rounded-2xl">
           <div className="flex items-center justify-between border-b border-border/60 pb-2">
             <span className="font-serif text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
               <Music className="h-3.5 w-3.5 text-primary" /> Ambient Soundscapes

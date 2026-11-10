@@ -107,3 +107,21 @@ export async function updateRequestStatus(
     return list[idx];
   });
 }
+
+export async function clearAllRequests(onlyResolved: boolean = false): Promise<void> {
+  return serialize(async () => {
+    if (onlyResolved) {
+      const list = await readRequests();
+      const pending = list.filter((r) => r.status === "pending" || r.status === "seen");
+      await writeRequests(pending);
+    } else {
+      await writeRequests([]);
+    }
+  });
+}
+
+export async function listUserRequests(userIdOrEmail: string): Promise<BookRequest[]> {
+  const list = await readRequests();
+  const norm = userIdOrEmail.toLowerCase().trim();
+  return list.filter((r) => r.userId === userIdOrEmail || r.userEmail.toLowerCase() === norm);
+}
