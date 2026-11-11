@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Sun, Moon } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Sun, Moon, Sparkles } from "lucide-react";
 import { useTheme } from "next-themes";
 import { getChapter, getChapters, recordBookView } from "@/services/api";
 import { useReaderStore } from "@/stores/useReaderStore";
@@ -16,6 +16,8 @@ import { blocksFromParagraphs } from "@/lib/textBlocks";
 import { AmbientAudio } from "@/components/reader/AmbientAudio";
 import { BedtimeWarmth } from "@/components/reader/BedtimeWarmth";
 import { ReaderGenreBackground } from "@/components/reader/ReaderGenreBackground";
+import { ReactionButtons } from "@/components/social/ReactionButtons";
+import { CommentsSection } from "@/components/social/CommentsSection";
 
 function isTypingTarget(t: EventTarget | null) {
   const el = t as HTMLElement | null;
@@ -63,6 +65,17 @@ export default function ChapterReaderPage() {
       setTheme("dark");
     }
   }, [isNight, updateSettings, setTheme]);
+
+  // Quick cycle animation intensity: ambient -> subtle -> off -> ambient
+  const cycleAnimationIntensity = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const cycleMap: Record<string, "ambient" | "subtle" | "off"> = {
+      ambient: "subtle",
+      subtle: "off",
+      off: "ambient",
+    };
+    updateSettings({ animationIntensity: cycleMap[settings.animationIntensity] || "ambient" });
+  }, [settings.animationIntensity, updateSettings]);
 
   useReaderChrome(readerMode);
 
@@ -185,7 +198,7 @@ export default function ChapterReaderPage() {
       data-reader-theme={settings.theme}
       data-reader-mode={readerMode ? "on" : "off"}
       className="reader-shell min-h-screen relative selection:bg-primary/30 transition-colors duration-300"
-      style={{ backgroundColor: "var(--reader-bg)", color: "var(--reader-text)" }}
+      style={{ backgroundColor: "transparent", color: "var(--reader-text)" }}
       onDoubleClick={toggleFullscreenReader}
     >
       <a href="#chapter-text" className="skip-link">Skip to chapter text</a>
@@ -195,6 +208,7 @@ export default function ChapterReaderPage() {
         genres={data?.book.genres}
         theme={settings.theme}
         isDark={isNight}
+        intensity={settings.animationIntensity}
       />
 
       <div
@@ -226,24 +240,38 @@ export default function ChapterReaderPage() {
         aria-hidden={!showChrome || !controlsVisible}
       >
         <div
-          className="mx-auto mt-2 flex max-w-4xl items-center justify-between rounded-full border px-3 py-1.5 shadow-calm backdrop-blur-md"
-          style={{ backgroundColor: "var(--reader-surface)", borderColor: "var(--reader-border)" }}
+          className="relative mx-auto mt-2 flex max-w-4xl items-center justify-between gap-2 rounded-full border px-2 sm:px-3 py-1.5 shadow-calm"
+          style={{ borderColor: "var(--reader-border)" }}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <Link href={`/book/${params.slug}`} aria-label="Back to book details" className="reader-icon-btn">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-full backdrop-blur-md -z-10"
+            style={{ backgroundColor: "var(--reader-surface)" }}
+          />
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <Link href={`/book/${params.slug}`} aria-label="Back to book details" className="reader-icon-btn shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div className="min-w-0">
-              <p className="truncate text-xs opacity-75">{data?.book.title}</p>
-              <p className="truncate font-serif text-sm font-semibold">
+              <p className="truncate text-[11px] sm:text-xs opacity-75">{data?.book.title}</p>
+              <p className="truncate font-serif text-xs sm:text-sm font-semibold">
                 {data ? `Ch. ${chapterNumber}: ${data.chapter.title}` : "Loading…"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0">
             <AmbientAudio />
             <BedtimeWarmth />
+            <button
+              type="button"
+              onClick={cycleAnimationIntensity}
+              aria-label={`Atmospheric animation: ${settings.animationIntensity} (click to cycle)`}
+              title={`Atmospheric animation: ${settings.animationIntensity} (click to cycle: ambient, subtle, off)`}
+              className={`reader-icon-btn ${settings.animationIntensity === "off" ? "opacity-40" : "text-primary"}`}
+            >
+              <Sparkles className="h-5 w-5" />
+            </button>
             <button
               type="button"
               onClick={() => setChaptersOpen((o) => !o)}
@@ -314,30 +342,67 @@ export default function ChapterReaderPage() {
             <ReaderBlocks blocks={blocks} settings={settings} />
 
             {!readerMode && (
-              <nav
-                aria-label="Chapter pagination"
-                className="mt-16 flex items-center justify-between gap-4 border-t pt-8 font-sans"
-                style={{ borderColor: "var(--reader-border)", fontSize: 14, fontWeight: 500 }}
-                onClick={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  disabled={!prevChapter}
-                  className="btn btn-reader disabled:opacity-40"
+              <>
+                {/* Chapter Like / Dislike Bar */}
+                <div
+                  className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 sm:p-5 font-sans"
+                  style={{
+                    borderColor: "var(--reader-border)",
+                    backgroundColor: "var(--reader-surface)",
+                    color: "var(--reader-text)",
+                    fontSize: 14,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                 >
-                  <ChevronLeft className="h-4 w-4" /> Previous Chapter
-                </button>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  disabled={!nextChapter}
-                  className="btn btn-primary disabled:opacity-40"
+                  <div>
+                    <p className="font-serif text-base font-semibold">How was this chapter?</p>
+                    <p className="text-xs opacity-70">Share a quick reaction with fellow readers.</p>
+                  </div>
+                  <ReactionButtons
+                    targetType="chapter"
+                    targetId={data.chapter.id}
+                    fetchOnMount
+                    variant="reader"
+                    size="md"
+                  />
+                </div>
+
+                <nav
+                  aria-label="Chapter pagination"
+                  className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-8 font-sans"
+                  style={{ borderColor: "var(--reader-border)", fontSize: 14, fontWeight: 500 }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                 >
-                  Next Chapter <ChevronRight className="h-4 w-4" />
-                </button>
-              </nav>
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={!prevChapter}
+                    className="btn btn-reader disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous Chapter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!nextChapter}
+                    className="btn btn-primary disabled:opacity-40"
+                  >
+                    Next Chapter <ChevronRight className="h-4 w-4" />
+                  </button>
+                </nav>
+
+                {/* Chapter Comments Section */}
+                <div className="mt-12 border-t pt-10" style={{ borderColor: "var(--reader-border)" }}>
+                  <CommentsSection
+                    targetType="chapter"
+                    targetId={data.chapter.id}
+                    heading={`Chapter ${data.chapter.number} Comments`}
+                    variant="reader"
+                  />
+                </div>
+              </>
             )}
           </ReaderColumn>
         )}

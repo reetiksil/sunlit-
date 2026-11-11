@@ -38,6 +38,8 @@ import { useBookshelfStore } from "@/stores/useBookshelfStore";
 import { BookshelfSelector } from "@/components/book/BookshelfSelector";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Review } from "@/types";
+import { ReactionButtons } from "@/components/social/ReactionButtons";
+import { CommentsSection } from "@/components/social/CommentsSection";
 
 export default function BookDetailPage() {
   const params = useParams<{ slug: string }>();
@@ -45,7 +47,7 @@ export default function BookDetailPage() {
   const { user } = useAuthStore();
   const { shelf, progress, setShelfCategory } = useBookshelfStore();
 
-  const [activeTab, setActiveTab] = useState<"chapters" | "about" | "reviews">("chapters");
+  const [activeTab, setActiveTab] = useState<"chapters" | "about" | "reviews" | "comments">("chapters");
   const [expandedDesc, setExpandedDesc] = useState(false);
   const [chapterSearch, setChapterSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
@@ -295,21 +297,21 @@ export default function BookDetailPage() {
         </div>
       </section>
 
-      {/* Tabs: Chapters / About / Reviews */}
+      {/* Tabs: Chapters / About / Reviews / Comments */}
       <section className="space-y-6">
         <div
           role="tablist"
           aria-label="Book sections"
-          className="flex gap-2 border-b border-border pb-2"
+          className="flex flex-wrap gap-2 border-b border-border pb-2"
         >
-          {(["chapters", "about", "reviews"] as const).map((tab) => (
+          {(["chapters", "about", "reviews", "comments"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               role="tab"
               aria-selected={activeTab === tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-5 py-2.5 text-sm font-semibold capitalize transition-colors ${
+              className={`rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold capitalize transition-colors ${
                 activeTab === tab
                   ? "bg-primary text-primary-fg"
                   : "text-text-muted hover:bg-surface-soft hover:text-text"
@@ -732,11 +734,32 @@ export default function BookDetailPage() {
                       )}
 
                       <p className="text-xs leading-relaxed text-text whitespace-pre-line">{r.content}</p>
+
+                      <div className="pt-1.5">
+                        <ReactionButtons
+                          targetType="review"
+                          targetId={r.id}
+                          initialLikeCount={r.likeCount ?? 0}
+                          initialDislikeCount={r.dislikeCount ?? 0}
+                          initialUserReaction={r.userReaction ?? null}
+                          size="sm"
+                        />
+                      </div>
                     </div>
                   );
                 })
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === "comments" && (
+          <div className="rounded-3xl border border-border bg-surface p-6 sm:p-8 shadow-calm">
+            <CommentsSection
+              targetType="book"
+              targetId={book.id}
+              heading="Book Comments"
+            />
           </div>
         )}
       </section>
