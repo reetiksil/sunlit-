@@ -1,23 +1,96 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Volume2, VolumeX, CloudRain, Flame, Wind, Music, Play, Pause } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Volume2,
+  VolumeX,
+  CloudRain,
+  Flame,
+  Wind,
+  Music,
+  Play,
+  Pause,
+  Swords,
+  Sparkles,
+  Compass,
+  HeartCrack,
+  ExternalLink,
+  Plus,
+} from "lucide-react";
 import { useReaderStore } from "@/stores/useReaderStore";
 
-export type AmbientSoundId = "none" | "gentle-rain" | "heavy-rain" | "hearth" | "wind";
+declare global {
+  interface Window {
+    onYouTubeIframeAPIReady?: () => void;
+    YT?: {
+      Player: new (
+        elementId: string,
+        config: {
+          videoId?: string;
+          width?: string | number;
+          height?: string | number;
+          playerVars?: Record<string, unknown>;
+          events?: {
+            onReady?: (event: { target: YTPlayerInstance }) => void;
+            onStateChange?: (event: { data: number }) => void;
+            onError?: (event: { data: number }) => void;
+          };
+        }
+      ) => YTPlayerInstance;
+      PlayerState: {
+        UNSTARTED: number;
+        ENDED: number;
+        PLAYING: number;
+        PAUSED: number;
+        BUFFERING: number;
+        CUED: number;
+      };
+    };
+  }
+}
 
-interface SoundTrack {
+export interface YTPlayerInstance {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  stopVideo: () => void;
+  setVolume: (volume: number) => void;
+  loadVideoById: (videoId: string) => void;
+  getPlayerState: () => number;
+  destroy?: () => void;
+}
+
+export type AmbientSoundId =
+  | "none"
+  | "gentle-rain"
+  | "heavy-rain"
+  | "hearth"
+  | "wind"
+  | "happy-filaments"
+  | "battle-goliath"
+  | "sad-solace"
+  | "mystery-dark-places"
+  | "custom-youtube";
+
+export type AmbientSoundCategory = "all" | "nature" | "music";
+
+export interface SoundTrack {
   id: AmbientSoundId;
   label: string;
-  file: string;
-  icon: typeof CloudRain;
+  category: "nature" | "music";
+  file?: string;
+  youtubeId?: string;
+  artist?: string;
+  youtubeUrl?: string;
+  icon: React.ComponentType<{ className?: string }>;
   description: string;
 }
 
-const SOUND_TRACKS: SoundTrack[] = [
+export const SOUND_TRACKS: SoundTrack[] = [
+  // 1. Natural High-Fidelity Audio Recordings
   {
     id: "gentle-rain",
     label: "Gentle Rain",
+    category: "nature",
     file: "/sounds/forest-rain.ogg",
     icon: CloudRain,
     description: "Gentle raindrops through forest trees",
@@ -25,37 +98,99 @@ const SOUND_TRACKS: SoundTrack[] = [
   {
     id: "heavy-rain",
     label: "Heavy Rain",
+    category: "nature",
     file: "/sounds/heavy-rain.ogg",
     icon: CloudRain,
     description: "Immersive, deep ambient rainfall",
   },
   {
     id: "hearth",
-    label: "Hearth",
+    label: "Hearth & Fire",
+    category: "nature",
     file: "/sounds/fireplace.ogg",
     icon: Flame,
     description: "Crackling log fire with warm embers",
   },
   {
     id: "wind",
-    label: "Wind",
+    label: "Mountain Wind",
+    category: "nature",
     file: "/sounds/wind.ogg",
     icon: Wind,
-    description: "Natural peaceful mountain & field breeze",
+    description: "Natural peaceful breeze across open fields",
+  },
+  // 2. Pure Instrumental Orchestral & Cinematic Mood Music
+  {
+    id: "happy-filaments",
+    label: "Uplifting & Serene",
+    category: "music",
+    youtubeId: "lR2lMI5Wn-A",
+    artist: "Scott Buckley · Instrumental",
+    youtubeUrl: "https://www.youtube.com/watch?v=lR2lMI5Wn-A",
+    icon: Sparkles,
+    description: "Warm strings & gentle piano instrumental",
+  },
+  {
+    id: "battle-goliath",
+    label: "Battle & Epic",
+    category: "music",
+    youtubeId: "qYTJ8hDj_Hc",
+    artist: "Scott Buckley · Instrumental",
+    youtubeUrl: "https://www.youtube.com/watch?v=qYTJ8hDj_Hc",
+    icon: Swords,
+    description: "Dramatic orchestral drums & heroic brass",
+  },
+  {
+    id: "sad-solace",
+    label: "Sad & Melancholy",
+    category: "music",
+    youtubeId: "nTtln5hekqw",
+    artist: "Scott Buckley · Instrumental",
+    youtubeUrl: "https://www.youtube.com/watch?v=nTtln5hekqw",
+    icon: HeartCrack,
+    description: "Poignant solo piano & reflective strings",
+  },
+  {
+    id: "mystery-dark-places",
+    label: "Mystery & Suspense",
+    category: "music",
+    youtubeId: "hrn0RA_y2LM",
+    artist: "Scott Buckley · Instrumental",
+    youtubeUrl: "https://www.youtube.com/watch?v=hrn0RA_y2LM",
+    icon: Compass,
+    description: "Atmospheric orchestral intrigue & quiet tension",
   },
 ];
 
+function extractYouTubeId(url: string): string | null {
+  const trimmed = url.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const match = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
 export function AmbientAudio() {
   const [activeSound, setActiveSound] = useState<AmbientSoundId>("none");
+  const [selectedCategory, setSelectedCategory] = useState<AmbientSoundCategory>("all");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.45);
+  const [volume, setVolume] = useState(0.5);
   const [isOpen, setIsOpen] = useState(false);
-  const readerMode = useReaderStore((s) => s.settings.readerMode);
+  const [customYtInput, setCustomYtInput] = useState("");
+  const [customYtId, setCustomYtId] = useState<string | null>(null);
+  const [ytReady, setYtReady] = useState(false);
+  const [ytError, setYtError] = useState<string | null>(null);
 
+  const readerMode = useReaderStore((s) => s.settings.readerMode);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const ytPlayerRef = useRef<YTPlayerInstance | null>(null);
+  const pendingYtIdRef = useRef<string | null>(null);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
-  // Close sound dropdown menu if open when entering reading mode (audio continues playing peacefully)
+  // Close sound dropdown menu if open when entering reading mode
   useEffect(() => {
     if (readerMode) {
       setIsOpen(false);
@@ -75,11 +210,8 @@ export function AmbientAudio() {
     } catch {}
   }, []);
 
-  // Sync volume with active audio
+  // Save volume preference
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
     try {
       localStorage.setItem("sunlit_ambient_volume", volume.toString());
     } catch {}
@@ -100,7 +232,43 @@ export function AmbientAudio() {
     };
   }, [isOpen]);
 
-  // Clean up audio on unmount
+  // Load YouTube IFrame API script once
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (window.YT && window.YT.Player) {
+      setYtReady(true);
+      return;
+    }
+
+    const prevOnReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (prevOnReady) prevOnReady();
+      setYtReady(true);
+    };
+
+    if (!document.getElementById("yt-iframe-api-script")) {
+      const tag = document.createElement("script");
+      tag.id = "yt-iframe-api-script";
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+  }, []);
+
+  // Sync volume with active audio & YouTube player
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+    if (ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.setVolume(Math.round(volume * 100));
+      } catch {}
+    }
+  }, [volume]);
+
+  // Clean up audio & YouTube player on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -108,82 +276,278 @@ export function AmbientAudio() {
         audioRef.current.src = "";
         audioRef.current = null;
       }
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.stopVideo();
+          ytPlayerRef.current.destroy?.();
+        } catch {}
+        ytPlayerRef.current = null;
+      }
     };
   }, []);
 
-  const selectSound = (soundId: AmbientSoundId) => {
+  const initYtPlayer = useCallback((videoId: string) => {
+    setYtError(null);
+    if (!window.YT || !window.YT.Player) {
+      // Queue playback until the YouTube IFrame API finishes loading
+      pendingYtIdRef.current = videoId;
+      return;
+    }
+
+    pendingYtIdRef.current = null;
+
+    if (ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.loadVideoById(videoId);
+        ytPlayerRef.current.setVolume(Math.round(volumeRef.current * 100));
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+      } catch {
+        setYtError("Unable to switch YouTube track. Please try again.");
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    ytPlayerRef.current = new window.YT.Player("sunlit-yt-player-iframe", {
+      videoId,
+      width: "100%",
+      height: "100%",
+      playerVars: {
+        autoplay: 1,
+        controls: 1,
+        loop: 1,
+        playlist: videoId,
+        modestbranding: 1,
+        rel: 0,
+        origin: typeof window !== "undefined" ? window.location.origin : undefined,
+      },
+      events: {
+        onReady: (event) => {
+          try {
+            event.target.setVolume(Math.round(volumeRef.current * 100));
+            event.target.playVideo();
+            setIsPlaying(true);
+            setYtError(null);
+          } catch {}
+        },
+        onStateChange: (event) => {
+          if (event.data === window.YT?.PlayerState.PLAYING) {
+            setIsPlaying(true);
+            setYtError(null);
+          } else if (event.data === window.YT?.PlayerState.PAUSED) {
+            setIsPlaying(false);
+          } else if (event.data === window.YT?.PlayerState.ENDED) {
+            try {
+              ytPlayerRef.current?.playVideo();
+            } catch {}
+          }
+        },
+        onError: (event) => {
+          setIsPlaying(false);
+          if (event.data === 101 || event.data === 150) {
+            setYtError("Embedding is disabled for this video by its uploader. Try another music link.");
+          } else {
+            setYtError("Could not play this track. Please verify the YouTube link or try another track.");
+          }
+        },
+      },
+    });
+  }, []);
+
+  // Flush queued track if the user clicked before YouTube API loaded
+  useEffect(() => {
+    if (ytReady && pendingYtIdRef.current) {
+      const queuedId = pendingYtIdRef.current;
+      pendingYtIdRef.current = null;
+      initYtPlayer(queuedId);
+    }
+  }, [ytReady, initYtPlayer]);
+
+  const selectSound = (soundId: AmbientSoundId, overrideYtId?: string) => {
+    setYtError(null);
+
     if (soundId === "none") {
+      pendingYtIdRef.current = null;
       if (audioRef.current) {
         audioRef.current.pause();
+      }
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.stopVideo();
+        } catch {}
       }
       setActiveSound("none");
       setIsPlaying(false);
       return;
     }
 
-    if (activeSound === soundId) {
-      // Toggle play/pause if clicking the same sound
-      if (isPlaying) {
-        audioRef.current?.pause();
-        setIsPlaying(false);
-      } else {
-        audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+    // Custom YouTube link track
+    if (soundId === "custom-youtube" && overrideYtId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
+      setActiveSound("custom-youtube");
+      setCustomYtId(overrideYtId);
+      initYtPlayer(overrideYtId);
       return;
     }
 
     const track = SOUND_TRACKS.find((t) => t.id === soundId);
     if (!track) return;
 
-    if (!audioRef.current) {
-      const audio = new Audio();
-      audio.loop = true;
-      audio.preload = "auto";
-      audioRef.current = audio;
+    if (activeSound === soundId) {
+      if (isPlaying) {
+        if (track.category === "music") {
+          ytPlayerRef.current?.pauseVideo();
+        } else {
+          audioRef.current?.pause();
+        }
+        setIsPlaying(false);
+      } else {
+        if (track.category === "music" && track.youtubeId) {
+          if (ytPlayerRef.current) {
+            ytPlayerRef.current.playVideo();
+          } else {
+            initYtPlayer(track.youtubeId);
+          }
+          setIsPlaying(true);
+        } else {
+          audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      }
+      return;
     }
 
-    const audio = audioRef.current;
-    audio.pause();
-    audio.src = track.file;
-    audio.volume = volume;
-    audio.currentTime = 0;
+    // Switching to another track
+    if (track.category === "music" && track.youtubeId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setActiveSound(soundId);
+      initYtPlayer(track.youtubeId);
+    } else if (track.file) {
+      pendingYtIdRef.current = null;
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.stopVideo();
+        } catch {}
+      }
 
-    audio
-      .play()
-      .then(() => {
-        setActiveSound(soundId);
-        setIsPlaying(true);
-      })
-      .catch((err) => {
-        console.warn("Audio autoplay prevented or error:", err);
-        setActiveSound(soundId);
-        setIsPlaying(false);
-      });
+      if (!audioRef.current) {
+        const audio = new Audio();
+        audio.loop = true;
+        audio.preload = "auto";
+        audioRef.current = audio;
+      }
+
+      const audio = audioRef.current;
+      audio.pause();
+      audio.src = track.file;
+      audio.volume = volume;
+      audio.currentTime = 0;
+
+      audio
+        .play()
+        .then(() => {
+          setActiveSound(soundId);
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.warn("Audio playback error:", err);
+          setActiveSound(soundId);
+          setIsPlaying(false);
+        });
+    }
   };
 
   const togglePlayback = () => {
     if (activeSound === "none") {
-      selectSound("gentle-rain");
+      selectSound("happy-filaments");
       return;
     }
 
-    if (!audioRef.current) return;
+    if (activeSound === "custom-youtube" && customYtId) {
+      if (isPlaying) {
+        ytPlayerRef.current?.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        if (ytPlayerRef.current) {
+          ytPlayerRef.current.playVideo();
+        } else {
+          initYtPlayer(customYtId);
+        }
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    const track = SOUND_TRACKS.find((t) => t.id === activeSound);
+    if (!track) return;
 
     if (isPlaying) {
-      audioRef.current.pause();
+      if (track.category === "music") {
+        ytPlayerRef.current?.pauseVideo();
+      } else {
+        audioRef.current?.pause();
+      }
       setIsPlaying(false);
     } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {});
+      if (track.category === "music" && track.youtubeId) {
+        if (ytPlayerRef.current) {
+          ytPlayerRef.current.playVideo();
+        } else {
+          initYtPlayer(track.youtubeId);
+        }
+        setIsPlaying(true);
+      } else {
+        audioRef.current
+          ?.play()
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
+      }
     }
   };
 
-  const currentTrack = SOUND_TRACKS.find((t) => t.id === activeSound);
+  const handleAddCustomYoutube = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = extractYouTubeId(customYtInput);
+    if (id) {
+      selectSound("custom-youtube", id);
+      setCustomYtInput("");
+    }
+  };
+
+  const currentTrack =
+    activeSound === "custom-youtube"
+      ? {
+          id: "custom-youtube" as AmbientSoundId,
+          label: "Custom YouTube Music",
+          category: "music" as const,
+          artist: "Custom Audio Stream",
+          youtubeId: customYtId ?? undefined,
+          youtubeUrl: customYtId ? `https://youtu.be/${customYtId}` : undefined,
+          icon: Music,
+          description: "Streamed via YouTube",
+        }
+      : SOUND_TRACKS.find((t) => t.id === activeSound);
+
+  const filteredTracks =
+    selectedCategory === "all"
+      ? SOUND_TRACKS
+      : SOUND_TRACKS.filter((t) => t.category === selectedCategory);
 
   return (
     <div className="relative inline-block text-left" ref={panelRef}>
+      {/* Persistent YouTube player container anchored invisibly inside viewport so Chromium/Edge never throttles playback */}
+      <div
+        id="sunlit-yt-player-container"
+        className="fixed bottom-1 right-1 h-28 w-48 pointer-events-none opacity-[0.01] -z-10"
+        aria-hidden="true"
+      >
+        <div id="sunlit-yt-player-iframe" className="h-full w-full" />
+      </div>
+
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -194,8 +558,8 @@ export function AmbientAudio() {
             ? "text-primary/80 border-primary/30"
             : ""
         }`}
-        title="Ambient Reading Sounds (Rain, Hearth, Wind)"
-        aria-label="Ambient sounds"
+        title="Ambient Reading Audio & Instrumental Music"
+        aria-label="Ambient reading audio and instrumental music"
         aria-expanded={isOpen}
       >
         {isPlaying ? (
@@ -209,10 +573,10 @@ export function AmbientAudio() {
       </button>
 
       {isOpen && (
-        <div className="card fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 z-50 sm:w-72 max-w-[calc(100vw-2rem)] p-4 border border-border shadow-2xl space-y-4 animate-in fade-in zoom-in-95 bg-surface text-text rounded-2xl">
+        <div className="card fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 z-50 sm:w-88 max-w-[calc(100vw-2rem)] p-4 border border-border shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95 bg-surface text-text rounded-2xl max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border/60 pb-2">
             <span className="font-serif text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
-              <Music className="h-3.5 w-3.5 text-primary" /> Ambient Soundscapes
+              <Music className="h-3.5 w-3.5 text-primary" /> Ambient Audio & Mood Music
             </span>
             <button
               type="button"
@@ -225,12 +589,36 @@ export function AmbientAudio() {
           </div>
 
           <p className="text-[11px] text-text-muted leading-tight">
-            Immersive natural atmospheres recorded in high fidelity to accompany your reading.
+            High-fidelity natural atmospheres and purely instrumental mood music tailored to accompany your reading.
           </p>
+
+          {/* Category filter pills */}
+          <div className="flex rounded-xl bg-surface-soft/60 p-1 border border-border/70 text-xs">
+            {(
+              [
+                { id: "all", label: "All" },
+                { id: "nature", label: "Nature" },
+                { id: "music", label: "Mood Music" },
+              ] as const
+            ).map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`flex-1 py-1 rounded-lg font-medium text-[11px] transition-all ${
+                  selectedCategory === cat.id
+                    ? "bg-surface text-text font-bold shadow-xs"
+                    : "text-text-muted hover:text-text"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
 
           {/* Sound selection list */}
           <div className="space-y-1.5">
-            {SOUND_TRACKS.map((track) => {
+            {filteredTracks.map((track) => {
               const isSelected = activeSound === track.id;
               const isCurrentlyPlaying = isSelected && isPlaying;
               const Icon = track.icon;
@@ -246,9 +634,9 @@ export function AmbientAudio() {
                       : "bg-surface-soft/60 hover:bg-surface-soft text-text"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div
-                      className={`p-1.5 rounded-lg ${
+                      className={`p-1.5 rounded-lg shrink-0 ${
                         isSelected
                           ? "bg-white/20 text-white"
                           : "bg-surface text-primary"
@@ -256,10 +644,23 @@ export function AmbientAudio() {
                     >
                       <Icon className="h-4 w-4" />
                     </div>
-                    <div>
-                      <p className="text-xs font-medium leading-none mb-0.5">{track.label}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-medium leading-none truncate">{track.label}</p>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded-full uppercase tracking-wider font-bold ${
+                            isSelected
+                              ? "bg-white/20 text-white"
+                              : track.category === "music"
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-accent-mint/20 text-accent-mint-fg"
+                          }`}
+                        >
+                          {track.category === "music" ? "Music" : "Nature"}
+                        </span>
+                      </div>
                       <p
-                        className={`text-[10px] leading-tight ${
+                        className={`text-[10px] leading-tight truncate mt-0.5 ${
                           isSelected ? "text-primary-fg/80" : "text-text-muted"
                         }`}
                       >
@@ -268,7 +669,7 @@ export function AmbientAudio() {
                     </div>
                   </div>
 
-                  <div className="flex items-center">
+                  <div className="flex items-center shrink-0">
                     {isCurrentlyPlaying ? (
                       <Pause className="h-3.5 w-3.5 opacity-90" />
                     ) : isSelected ? (
@@ -280,7 +681,58 @@ export function AmbientAudio() {
             })}
           </div>
 
-          {/* Master controls when sound is active */}
+          {/* Add custom YouTube music link */}
+          <form onSubmit={handleAddCustomYoutube} className="pt-1">
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Paste any YouTube music link or ID..."
+                value={customYtInput}
+                onChange={(e) => setCustomYtInput(e.target.value)}
+                className="input input-sm text-xs flex-1 rounded-xl bg-surface-soft/80 border-border text-text placeholder:text-text-muted/60"
+              />
+              <button
+                type="submit"
+                disabled={!extractYouTubeId(customYtInput)}
+                className="btn btn-sm btn-primary rounded-xl px-2.5 text-xs inline-flex items-center gap-1 disabled:opacity-40"
+                title="Play YouTube track"
+              >
+                <Plus className="h-3.5 w-3.5" /> Play
+              </button>
+            </div>
+          </form>
+
+          {ytError && (
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-600 dark:text-red-400">
+              {ytError}
+            </p>
+          )}
+
+          {/* Currently playing track details */}
+          {activeSound !== "none" && currentTrack && (
+            <div className="rounded-xl border border-border/70 bg-surface-soft/70 p-2.5 space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-text truncate max-w-[180px]">
+                  {currentTrack.label}
+                </span>
+                {currentTrack.youtubeUrl && (
+                  <a
+                    href={currentTrack.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-primary hover:underline inline-flex items-center gap-1 shrink-0"
+                  >
+                    YouTube <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                )}
+              </div>
+              {currentTrack.artist && (
+                <p className="text-[10px] text-text-muted truncate">{currentTrack.artist}</p>
+              )}
+            </div>
+          )}
+
+          {/* Master volume & playback controls when sound is active */}
           {activeSound !== "none" && (
             <div className="pt-2 border-t border-border/50 space-y-3">
               <div className="flex items-center justify-between">
@@ -311,7 +763,7 @@ export function AmbientAudio() {
 
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px] text-text-muted">
-                  <span>Ambience Volume</span>
+                  <span>Audio Volume</span>
                   <span>{Math.round(volume * 100)}%</span>
                 </div>
                 <input

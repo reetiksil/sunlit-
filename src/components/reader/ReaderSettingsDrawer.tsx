@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { RotateCcw, X, Maximize2 } from "lucide-react";
+import { RotateCcw, X, Maximize2, Sparkles } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useReaderStore } from "@/stores/useReaderStore";
 import {
@@ -11,7 +11,7 @@ import {
   THEME_OPTIONS,
   fontStack,
 } from "@/lib/readerStyle";
-import type { ReaderWidth } from "@/types";
+import type { ReaderWidth, AnimationIntensity } from "@/types";
 
 interface Props {
   open: boolean;
@@ -22,6 +22,12 @@ const WIDTHS: { value: ReaderWidth; label: string }[] = [
   { value: "narrow", label: "Narrow" },
   { value: "medium", label: "Medium" },
   { value: "wide", label: "Wide" },
+];
+
+const INTENSITY_OPTIONS: { value: AnimationIntensity; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "subtle", label: "Subtle" },
+  { value: "ambient", label: "Ambient" },
 ];
 
 function Segmented<T extends string | number>({
@@ -246,6 +252,18 @@ export function ReaderSettingsDrawer({ open, onClose }: Props) {
 
           <Segmented label="Column width" value={settings.contentWidth} options={WIDTHS}
             onChange={(v) => updateSettings({ contentWidth: v })} />
+
+          <div className="space-y-1.5">
+            <Segmented
+              label="Atmospheric Animation"
+              value={settings.animationIntensity}
+              options={INTENSITY_OPTIONS}
+              onChange={(v) => updateSettings({ animationIntensity: v })}
+            />
+            <p className="text-[11px] text-text-muted leading-tight">
+              Subtle genre-tailored lighting, drifting motes, and ambient environmental motion that remains behind text.
+            </p>
+          </div>
 
           <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 text-xs text-text-muted space-y-1">
             <p className="font-semibold text-text flex items-center gap-1.5 text-sm">

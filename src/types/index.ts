@@ -68,6 +68,7 @@ export type ReaderFontFamily =
 export type ReaderTheme = "day" | "sepia" | "paper" | "night" | "true-dark";
 export type ReaderWidth = "narrow" | "medium" | "wide";
 export type ReaderFontWeight = 400 | 600;
+export type AnimationIntensity = "ambient" | "subtle" | "off";
 
 export interface ReaderSettings {
   fontSize: number; // 14 - 30px (see READER_LIMITS)
@@ -79,6 +80,7 @@ export interface ReaderSettings {
   contentWidth: ReaderWidth;
   theme: ReaderTheme;
   readerMode: boolean; // distraction-free layout: hides site chrome
+  animationIntensity: AnimationIntensity; // genre-themed background animation level
 }
 
 export type ShelfCategory = "reading" | "plan-to-read" | "completed";
@@ -116,6 +118,29 @@ export interface User {
   joinedAt: string;
 }
 
+export type ReactionType = "like" | "dislike";
+export type CommentTargetType = "book" | "chapter";
+export type ReactionTargetType = "chapter" | "comment" | "review";
+
+export interface ReactionSummary {
+  likeCount: number;
+  dislikeCount: number;
+  userReaction: ReactionType | null;
+}
+
+export interface Comment {
+  id: string;
+  targetType: CommentTargetType;
+  targetId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: string;
+  likeCount: number;
+  dislikeCount: number;
+  userReaction: ReactionType | null;
+}
+
 export interface Review {
   id: string;
   bookId: string;
@@ -127,6 +152,9 @@ export interface Review {
   content: string;
   createdAt: string;
   updatedAt: string;
+  likeCount?: number;
+  dislikeCount?: number;
+  userReaction?: ReactionType | null;
 }
 
 export interface BookRequest {

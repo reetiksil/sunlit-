@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type {
+  AnimationIntensity,
   ReaderFontFamily,
   ReaderFontWeight,
   ReaderSettings,
@@ -23,6 +24,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   contentWidth: "medium",
   theme: "day",
   readerMode: false,
+  animationIntensity: "ambient",
 };
 
 export const FONT_OPTIONS: { value: ReaderFontFamily; label: string; stack: string }[] = [
@@ -61,6 +63,11 @@ export function sanitizeSettings(raw: Partial<ReaderSettings> | null | undefined
   const d = DEFAULT_READER_SETTINGS;
   const r = (raw ?? {}) as Record<string, unknown>;
   const L = READER_LIMITS;
+  const ANIMATION_INTENSITIES: AnimationIntensity[] = ["ambient", "subtle", "off"];
+  const animIntensity = ANIMATION_INTENSITIES.includes(r.animationIntensity as AnimationIntensity)
+    ? (r.animationIntensity as AnimationIntensity)
+    : d.animationIntensity;
+
   return {
     fontSize: Math.round(clamp(num(r.fontSize, d.fontSize), L.fontSize.min, L.fontSize.max)),
     fontFamily: FAMILIES.includes(r.fontFamily as ReaderFontFamily) ? (r.fontFamily as ReaderFontFamily) : d.fontFamily,
@@ -72,6 +79,7 @@ export function sanitizeSettings(raw: Partial<ReaderSettings> | null | undefined
     contentWidth: r.contentWidth === "narrow" || r.contentWidth === "wide" ? r.contentWidth : "medium",
     theme: THEMES.includes(r.theme as ReaderTheme) ? (r.theme as ReaderTheme) : d.theme,
     readerMode: r.readerMode === true,
+    animationIntensity: animIntensity,
   };
 }
 
