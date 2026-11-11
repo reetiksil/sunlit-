@@ -16,14 +16,17 @@ import {
   Send,
   MessageSquarePlus,
   Clock,
-  Sparkles,
-  BookMarked,
   Languages,
+  FileText,
+  CalendarDays,
+  User as UserIcon,
+  Lock,
 } from "lucide-react";
 import {
   getBook,
   getChapters,
   getAllBooks,
+  getGenres,
   getReviews,
   postReview,
   deleteReview,
@@ -78,6 +81,11 @@ export default function BookDetailPage() {
   const { data: allBooks = [] } = useQuery({
     queryKey: ["books-all"],
     queryFn: getAllBooks,
+  });
+
+  const { data: allGenres = [] } = useQuery({
+    queryKey: ["genres"],
+    queryFn: getGenres,
   });
 
   const { data: reviews = [] } = useQuery({
@@ -255,7 +263,7 @@ export default function BookDetailPage() {
 
           <div className="space-y-2">
             <p
-              className={`text-sm leading-relaxed text-text-muted ${
+              className={`text-sm leading-relaxed text-text-muted whitespace-pre-line ${
                 expandedDesc ? "" : "line-clamp-3"
               }`}
             >
@@ -366,57 +374,131 @@ export default function BookDetailPage() {
           </div>
         )}
 
-        {activeTab === "about" && (
-          <div className="rounded-3xl border border-border bg-surface p-8 space-y-6 shadow-calm">
-            <div>
-              <h2 className="font-serif text-xl font-semibold text-text">About This Edition & Work</h2>
-              <p className="mt-1 text-xs text-text-muted">
-                Curator details, typographic specifications, and publication notes for this sanctuary edition.
-              </p>
+        {activeTab === "about" && (() => {
+          const totalWords = chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+          const avgWordsPerChapter = chapters.length > 0 ? Math.round(totalWords / chapters.length) : 0;
+          const totalMinutes = totalWords > 0
+            ? Math.max(1, Math.round(totalWords / 220))
+            : Math.max(1, (book.chapterCount || 1) * 7);
+          const readTimeLabel =
+            totalMinutes >= 60
+              ? `~${Math.floor(totalMinutes / 60)} hr ${totalMinutes % 60 > 0 ? `${totalMinutes % 60} min` : ""}`.trim()
+              : `~${totalMinutes} min`;
+          const authorBooks = allBooks.filter(
+            (b) => b.author.toLowerCase() === book.author.toLowerCase()
+          );
+          const matchedGenres = book.genres.map((slug) => ({
+            slug,
+            meta: allGenres.find((g) => g.slug === slug),
+          }));
+
+          return (
+            <div className="rounded-3xl border border-border bg-surface p-6 sm:p-8 space-y-6 shadow-calm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-4">
+                <div>
+                  <h2 className="font-serif text-xl font-semibold text-text">Book Information</h2>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Publication details, word length, and reader pacing for this work.
+                  </p>
+                </div>
+                <span className="rounded-full bg-accent-mint/30 px-3 py-1 text-xs font-semibold capitalize text-text">
+                  Status: {book.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                    <Languages className="h-3.5 w-3.5 text-primary" /> Original Language
+                  </span>
+                  <p className="text-sm font-semibold capitalize text-text">{book.language || "English"}</p>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-primary" /> Estimated Read Time
+                  </span>
+                  <p className="text-sm font-semibold text-text">{readTimeLabel}</p>
+                  <p className="text-[11px] text-text-muted">At ~220 words/min</p>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Length & Chapters
+                  </span>
+                  <p className="text-sm font-semibold text-text">
+                    {totalWords > 0 ? `${totalWords.toLocaleString()} words` : `${book.chapterCount} chapters`}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    {book.chapterCount} {book.chapterCount === 1 ? "chapter" : "chapters"}
+                    {avgWordsPerChapter > 0 ? ` · ~${avgWordsPerChapter.toLocaleString()} words/ch` : ""}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-surface-soft/60 p-4 space-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" /> Release Timeline
+                  </span>
+                  <p className="text-sm font-semibold text-text">
+                    Updated{" "}
+                    {new Date(book.updatedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    Added{" "}
+                    {new Date(book.createdAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-border bg-bg/50 p-5 space-y-3">
+                  <h3 className="font-serif text-sm font-semibold text-text flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-primary" /> Author Catalog
+                  </h3>
+                  <p className="text-xs leading-relaxed text-text-muted">
+                    Written by <strong className="text-text">{book.author}</strong>.{" "}
+                    {authorBooks.length > 1
+                      ? `${authorBooks.length} works by this author are available in the library.`
+                      : "This is currently their featured title in the library."}
+                  </p>
+                  <Link
+                    href={`/browse?author=${encodeURIComponent(book.author)}`}
+                    className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
+                  >
+                    Browse all works by {book.author} →
+                  </Link>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-bg/50 p-5 space-y-3">
+                  <h3 className="font-serif text-sm font-semibold text-text">Genres & Story Tags</h3>
+                  <div className="space-y-2">
+                    {matchedGenres.map(({ slug, meta }) => (
+                      <div key={slug} className="flex items-start justify-between gap-3 text-xs">
+                        <Link
+                          href={`/browse?genres=${encodeURIComponent(slug)}`}
+                          className="shrink-0 rounded-full bg-surface-soft px-2.5 py-0.5 font-semibold capitalize text-text hover:bg-primary/25"
+                        >
+                          {meta?.name || slug.replace("-", " ")}
+                        </Link>
+                        {meta?.description && (
+                          <span className="text-text-muted text-right line-clamp-1">{meta.description}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="rounded-2xl border border-border bg-surface-soft/60 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Languages className="h-3.5 w-3.5 text-primary" /> Original Language
-                </span>
-                <p className="mt-1 text-sm font-semibold capitalize text-text">{book.language || "English"}</p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-surface-soft/60 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-primary" /> Estimated Read Time
-                </span>
-                <p className="mt-1 text-sm font-semibold text-text">
-                  ~{Math.max(15, (book.chapterCount || 1) * 7)} minutes
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-surface-soft/60 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <BookMarked className="h-3.5 w-3.5 text-primary" /> Edition Format
-                </span>
-                <p className="mt-1 text-sm font-semibold text-text">Sunlit Digital Edition</p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-surface-soft/60 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Curated Collection
-                </span>
-                <p className="mt-1 text-sm font-semibold text-text capitalize">{book.status} Archive</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-bg/50 p-5 space-y-2">
-              <h3 className="font-serif text-sm font-semibold text-text">Sanctuary Reading Environment</h3>
-              <p className="text-xs leading-relaxed text-text-muted">
-                This edition includes high-fidelity ambient natural audio (forest rain, fireplace, soothing winds),
-                warm candlelight blue-light eye relaxation, and adaptive typography options including Fraunces, Lora,
-                Merriweather, and Atkinson Hyperlegible for maximum accessibility.
-              </p>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {activeTab === "reviews" && (
           <div className="rounded-3xl border border-border bg-surface p-8 space-y-8 shadow-calm">
@@ -438,24 +520,56 @@ export default function BookDetailPage() {
               </div>
             </div>
 
-            {/* Write / Edit Review Form */}
+            {/* Write / Edit Review Form (One review per reader; existing review can be edited) */}
             {user ? (
-              <form onSubmit={handleSubmitReview} className="rounded-2xl border border-border bg-surface-soft/40 p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-serif text-sm font-bold text-text flex items-center gap-2">
-                    <MessageSquarePlus className="h-4 w-4 text-primary" />
-                    {editingReviewId ? "Edit Your Reflection" : userExistingReview ? "Update Your Reflection" : "Write a Reflection"}
-                  </h3>
-                  {editingReviewId && (
+              userExistingReview && !editingReviewId ? (
+                <div className="rounded-2xl border border-border bg-surface-soft/50 p-6 flex flex-wrap items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h3 className="font-serif text-sm font-bold text-text flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      You have already reviewed this book
+                    </h3>
+                    <p className="text-xs text-text-muted">
+                      Each reader can submit one review per book. You can update or remove your existing review below.
+                    </p>
+                    {reviewSuccess && (
+                      <p className="mt-2 text-xs font-medium text-primary">{reviewSuccess}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleCancelEditReview}
-                      className="text-xs text-text-muted hover:text-text underline"
+                      disabled
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-xs font-semibold text-text-muted opacity-60 cursor-not-allowed"
                     >
-                      Cancel Edit
+                      <Lock className="h-3.5 w-3.5" /> Review Submitted
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditReview(userExistingReview)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-primary-fg shadow-sm hover:brightness-105"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" /> Edit Your Review
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <form onSubmit={handleSubmitReview} className="rounded-2xl border border-border bg-surface-soft/40 p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-sm font-bold text-text flex items-center gap-2">
+                      <MessageSquarePlus className="h-4 w-4 text-primary" />
+                      {editingReviewId ? "Edit Your Reflection" : "Write a Reflection"}
+                    </h3>
+                    {editingReviewId && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEditReview}
+                        className="text-xs text-text-muted hover:text-text underline"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </div>
 
                 {reviewError && (
                   <p className="rounded-xl bg-danger/10 border border-danger/20 p-3 text-xs text-danger font-medium">
@@ -519,17 +633,18 @@ export default function BookDetailPage() {
                   />
                 </div>
 
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingReview || !reviewContent.trim()}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-semibold text-primary-fg shadow-sm hover:brightness-105 disabled:opacity-50"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    {isSubmittingReview ? "Saving…" : editingReviewId ? "Update Reflection" : "Publish Reflection"}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingReview || !reviewContent.trim()}
+                      className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-xs font-semibold text-primary-fg shadow-sm hover:brightness-105 disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {isSubmittingReview ? "Saving…" : editingReviewId ? "Update Reflection" : "Publish Reflection"}
+                    </button>
+                  </div>
+                </form>
+              )
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-surface-soft/30 p-6 text-center space-y-2">
                 <p className="text-xs font-semibold text-text">Have you enjoyed this story?</p>
@@ -537,7 +652,7 @@ export default function BookDetailPage() {
                   Sign in to your account to leave a reflection, rate chapters, and share your quiet reading moments.
                 </p>
                 <Link
-                  href="/auth/login"
+                  href={`/login?next=${encodeURIComponent(`/book/${book.slug}`)}`}
                   className="inline-block mt-2 rounded-full bg-primary/20 px-5 py-2 text-xs font-semibold text-text hover:bg-primary/30"
                 >
                   Sign In to Review

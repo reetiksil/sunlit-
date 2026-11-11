@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronLeft, ChevronRight, List, Settings2, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { getChapter, getChapters } from "@/services/api";
+import { getChapter, getChapters, recordBookView } from "@/services/api";
 import { useReaderStore } from "@/stores/useReaderStore";
 import { useBookshelfStore } from "@/stores/useBookshelfStore";
 import { ReaderSettingsDrawer } from "@/components/reader/ReaderSettingsDrawer";
@@ -102,6 +102,12 @@ export default function ChapterReaderPage() {
     enabled: !!data?.book.id,
     queryFn: () => getChapters(data!.book.id),
   });
+
+  useEffect(() => {
+    if (data?.book.id) {
+      void recordBookView(data.book.id);
+    }
+  }, [data?.book.id]);
 
   const blocks = useMemo(() => blocksFromParagraphs(data?.chapter.content ?? []), [data]);
 
