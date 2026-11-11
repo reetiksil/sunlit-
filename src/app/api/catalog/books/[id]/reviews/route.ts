@@ -1,5 +1,6 @@
 import { getCurrentUser, json, sameOriginOrReject } from "@/lib/server/guard";
 import { deleteReview, listReviews, upsertReview } from "@/lib/server/catalog";
+import { getReactionSummaries } from "@/lib/server/engagement";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -16,8 +17,17 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const reviews = await listReviews(params.id);
-  return json(reviews);
+  const [reviews, user] = await Promise.all([listReviews(params.id), getCurrentUser()]);
+  const summaries = await getReactionSummaries(
+    "review",
+    reviews.map((r) => r.id),
+    user?.id
+  );
+  const enriched = reviews.map((r) => ({
+    ...r,
+    ...(summaries[r.id] ?? { likeCount: 0, dislikeCount: 0, userReaction: null }),
+  }));
+  return json(enriched);
 }
 
 export async function POST(

@@ -1,5 +1,18 @@
 import { GENRES } from "@/data/seed";
-import { Book, BookFilterParams, BookRequest, Chapter, Genre, Review, User } from "@/types";
+import {
+  Book,
+  BookFilterParams,
+  BookRequest,
+  Chapter,
+  Comment,
+  CommentTargetType,
+  Genre,
+  ReactionSummary,
+  ReactionTargetType,
+  ReactionType,
+  Review,
+  User,
+} from "@/types";
 
 export function filterAndSortBooks(books: Book[], filters?: BookFilterParams): Book[] {
   let result = [...books];
@@ -120,6 +133,36 @@ export const deleteReview = (bookId: string, reviewId: string) =>
     method: "DELETE",
   });
 
+export const getComments = (targetType: CommentTargetType, targetId: string, offset = 0, limit = 25) =>
+  request<{ comments: Comment[]; total: number; hasMore: boolean }>(
+    `/api/catalog/comments?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}&offset=${offset}&limit=${limit}`,
+    { cache: "no-store" }
+  );
+
+export const postComment = (targetType: CommentTargetType, targetId: string, content: string) =>
+  request<Comment>("/api/catalog/comments", {
+    method: "POST",
+    body: JSON.stringify({ targetType, targetId, content }),
+  });
+
+export const deleteComment = (targetType: CommentTargetType, targetId: string, commentId: string) =>
+  request<{ ok: true }>(
+    `/api/catalog/comments?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}&commentId=${encodeURIComponent(commentId)}`,
+    { method: "DELETE" }
+  );
+
+export const getReaction = (targetType: ReactionTargetType, targetId: string) =>
+  request<ReactionSummary>(
+    `/api/catalog/reactions?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`,
+    { cache: "no-store" }
+  );
+
+export const toggleReaction = (targetType: ReactionTargetType, targetId: string, reaction: ReactionType) =>
+  request<ReactionSummary>("/api/catalog/reactions", {
+    method: "POST",
+    body: JSON.stringify({ targetType, targetId, reaction }),
+  });
+
 export const recordBookView = (bookId: string) =>
   request<{ ok: true; views: number }>(`/api/catalog/books/${encodeURIComponent(bookId)}/view`, { method: "POST" }).catch(
     () => ({ ok: false, views: 0 })
@@ -139,7 +182,10 @@ export const deleteUser = (userId: string) =>
   request<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
 
 export const getUserActivity = (userId: string) =>
-  request<{ reviews: Review[]; requests: BookRequest[] }>(`/api/admin/users/${encodeURIComponent(userId)}/activity`, {
+  request<{
+    reviews: Array<Review & { bookTitle?: string; bookSlug?: string }>;
+    requests: BookRequest[];
+  }>(`/api/admin/users/${encodeURIComponent(userId)}/activity`, {
     cache: "no-store",
   });
 
