@@ -108,15 +108,16 @@ export async function updateRequestStatus(
   });
 }
 
-export async function clearAllRequests(onlyResolved: boolean = false): Promise<void> {
+export async function clearAllRequests(onlyResolved: boolean = false): Promise<number> {
   return serialize(async () => {
+    const list = await readRequests();
     if (onlyResolved) {
-      const list = await readRequests();
       const pending = list.filter((r) => r.status === "pending" || r.status === "seen");
       await writeRequests(pending);
-    } else {
-      await writeRequests([]);
+      return list.length - pending.length;
     }
+    await writeRequests([]);
+    return list.length;
   });
 }
 

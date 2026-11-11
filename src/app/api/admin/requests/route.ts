@@ -22,6 +22,6 @@ export async function DELETE(req: Request) {
   const { searchParams } = new URL(req.url);
   const onlyResolved = searchParams.get("onlyResolved") === "true";
 
-  await clearAllRequests(onlyResolved);
-  return json({ success: true });
+  const cleared = await clearAllRequests(onlyResolved);
+  return json({ ok: true, cleared });
 }

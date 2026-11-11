@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const genreSlug = z.enum(["fantasy", "romance", "sci-fi", "slice-of-life", "mystery", "adventure", "historical", "cozy"]);
+const genreSlug = z.string().trim().min(1).max(50).regex(/^[a-z0-9-]+$/, "Invalid genre slug.");
 const isoDate = z.string().min(1).max(40);
 
 export const bookSchema = z.object({

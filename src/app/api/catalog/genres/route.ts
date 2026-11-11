@@ -1,5 +1,5 @@
 import { json, requireRole, sameOriginOrReject } from "@/lib/server/guard";
-import { createGenre, listGenres } from "@/lib/server/catalog";
+import { createGenre, deleteGenre, listGenres } from "@/lib/server/catalog";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -39,4 +39,19 @@ export async function POST(req: Request) {
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "Could not create genre." }, 400);
   }
+}
+
+export async function DELETE(req: Request) {
+  const blocked = sameOriginOrReject(req);
+  if (blocked) return blocked;
+
+  const auth = await requireRole("admin");
+  if ("error" in auth) return auth.error;
+
+  const { searchParams } = new URL(req.url);
+  const slug = searchParams.get("slug")?.trim();
+  if (!slug) return json({ error: "Genre slug or ID is required." }, 400);
+
+  await deleteGenre(slug);
+  return json({ ok: true });
 }
