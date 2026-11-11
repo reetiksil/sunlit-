@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer,
@@ -29,7 +30,6 @@ import {
   Upload,
   Image as ImageIcon,
   Check,
-  Tag,
   Ban,
   UserCheck,
   UserX,
@@ -52,14 +52,12 @@ import {
   getAdminRequests,
   updateBookRequestStatus,
   getGenres,
-  createGenre,
-  deleteGenre,
   clearAdminRequests,
   banUser,
   deleteUser,
   getUserActivity,
 } from "@/services/api";
-import { Book, Chapter, GenreSlug, BookRequest, User, Genre, Review } from "@/types";
+import { Book, Chapter, GenreSlug, BookRequest, User, Review } from "@/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
 const ANALYTICS_DATA = [
@@ -83,17 +81,16 @@ export default function AdminDashboardPage() {
   const { data: requests = [] } = useQuery({ queryKey: ["admin-requests"], queryFn: getAdminRequests, enabled: isAdmin });
   const { data: genres = [] } = useQuery({ queryKey: ["genres"], queryFn: getGenres });
 
-  const [tab, setTab] = useState<"overview" | "books" | "editor" | "requests" | "users" | "genres">("overview");
+  const [tab, setTab] = useState<"overview" | "books" | "editor" | "requests" | "users">("overview");
   const [search, setSearch] = useState("");
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  // Genre Management State
-  const [newGenreName, setNewGenreName] = useState("");
-  const [newGenreSlug, setNewGenreSlug] = useState("");
-  const [newGenreDesc, setNewGenreDesc] = useState("");
-
   // User Profile Modal State
   const [selectedUserForProfile, setSelectedUserForProfile] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Book Form State (Create / Edit)
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
@@ -221,27 +218,6 @@ export default function AdminDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setSelectedUserForProfile(null);
       setFlash({ kind: "ok", text: "User account removed." });
-    },
-    onError,
-  });
-
-  const addGenreMutation = useMutation({
-    mutationFn: (genre: Genre) => createGenre(genre),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["genres"] });
-      setNewGenreName("");
-      setNewGenreSlug("");
-      setNewGenreDesc("");
-      setFlash({ kind: "ok", text: "New genre created successfully." });
-    },
-    onError,
-  });
-
-  const deleteGenreMutation = useMutation({
-    mutationFn: (slug: string) => deleteGenre(slug),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["genres"] });
-      setFlash({ kind: "ok", text: "Genre removed." });
     },
     onError,
   });
@@ -381,7 +357,6 @@ export default function AdminDashboardPage() {
               { id: "editor", label: "Chapter Studio" },
               { id: "requests", label: "Requests", badge: pendingRequestsCount },
               { id: "users", label: "Users" },
-              { id: "genres", label: "Manage Genres" },
             ] as const
           ).map((item) => (
             <button
@@ -598,15 +573,15 @@ export default function AdminDashboardPage() {
           </form>
 
           {/* Book Catalog Table */}
-          <div className="card p-6 space-y-4 border border-border lg:col-span-7">
-            <div className="flex items-center justify-between">
+          <div className="card p-5 sm:p-6 space-y-4 border border-border lg:col-span-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-serif text-xl font-bold">Books in Catalog ({books.length})</h2>
               <input
                 type="search"
                 placeholder="Search catalog…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="input h-9 w-48 text-xs"
+                className="input h-9 w-full sm:w-48 text-xs"
               />
             </div>
 
@@ -614,7 +589,7 @@ export default function AdminDashboardPage() {
               {books
                 .filter((b) => b.title.toLowerCase().includes(search.toLowerCase()))
                 .map((b) => (
-                  <div key={b.id} className="flex items-center justify-between py-3.5 gap-3">
+                  <div key={b.id} className="flex flex-wrap items-center justify-between py-3.5 gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       {b.coverImageUrl ? (
                         <div className="h-12 w-9 rounded overflow-hidden flex-shrink-0 border border-border">
@@ -910,7 +885,7 @@ export default function AdminDashboardPage() {
             <div className="divide-y divide-border/60">
               {requests.map((req) => (
                 <div key={req.id} className="py-4 space-y-2">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h3 className="font-serif font-semibold text-base text-text">
                         {req.title} <span className="font-normal text-text-muted">by {req.author}</span>
@@ -1023,118 +998,16 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Manage Genres Tab */}
-      {tab === "genres" && (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-          {/* Create New Genre */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newGenreName.trim()) return;
-              const slug = (newGenreSlug.trim() || newGenreName.trim().toLowerCase().replace(/\s+/g, "-")) as GenreSlug;
-              addGenreMutation.mutate({
-                id: `genre-${Date.now()}`,
-                name: newGenreName.trim(),
-                slug,
-                description: newGenreDesc.trim() || "Serene reading mood",
-                colorToken: "primary",
-              });
-            }}
-            className="card p-6 space-y-4 border border-border lg:col-span-5 shadow-sm"
-          >
-            <h2 className="font-serif text-xl font-bold flex items-center gap-2">
-              <Tag className="h-5 w-5 text-primary" /> Add New Genre / Mood
-            </h2>
-            <p className="text-xs text-text-muted">
-              Add new catalog filters and reading moods to the library filter salon.
-            </p>
-
-            <div className="field">
-              <label className="label">Genre Name *</label>
-              <input
-                type="text"
-                required
-                value={newGenreName}
-                onChange={(e) => setNewGenreName(e.target.value)}
-                placeholder="e.g. Historical Fiction"
-                className="input"
-              />
-            </div>
-
-            <div className="field">
-              <label className="label">Genre Slug (optional URL identifier)</label>
-              <input
-                type="text"
-                value={newGenreSlug}
-                onChange={(e) => setNewGenreSlug(e.target.value)}
-                placeholder="e.g. historical-fiction"
-                className="input font-mono text-xs"
-              />
-            </div>
-
-            <div className="field">
-              <label className="label">Description</label>
-              <textarea
-                rows={2}
-                value={newGenreDesc}
-                onChange={(e) => setNewGenreDesc(e.target.value)}
-                placeholder="A brief tranquil description of this mood…"
-                className="input py-2 h-auto resize-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={addGenreMutation.isPending || !newGenreName.trim()}
-              className="btn btn-primary w-full shadow-sm"
-            >
-              {addGenreMutation.isPending ? "Creating…" : "Add Genre to Catalog"}
-            </button>
-          </form>
-
-          {/* Existing Genres List */}
-          <div className="card p-6 space-y-4 border border-border lg:col-span-7 shadow-sm">
-            <h2 className="font-serif text-xl font-bold">Catalog Genres ({genres.length})</h2>
-            <div className="divide-y divide-border/60">
-              {genres.map((g) => (
-                <div key={g.id} className="flex items-center justify-between py-3 gap-2">
-                  <div>
-                    <p className="font-semibold text-sm text-text flex items-center gap-2">
-                      {g.name}
-                      <span className="font-mono text-[10px] text-text-muted bg-surface-soft px-2 py-0.5 rounded">
-                        /{g.slug}
-                      </span>
-                    </p>
-                    <p className="text-xs text-text-muted">{g.description}</p>
-                  </div>
-                  {/* Allow deleting custom genres */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`Remove genre "${g.name}" from catalog filters?`)) {
-                        deleteGenreMutation.mutate(g.slug);
-                      }
-                    }}
-                    className="p-1.5 text-danger hover:bg-danger/10 rounded-lg"
-                    title="Remove Genre"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* User Profile & Activity Modal */}
-      {selectedUserForProfile && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-          onClick={() => setSelectedUserForProfile(null)}
-        >
+      {mounted &&
+        selectedUserForProfile &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+            onClick={() => setSelectedUserForProfile(null)}
+          >
           <div
             className="w-full max-w-2xl rounded-3xl border border-border bg-surface p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -1237,17 +1110,38 @@ export default function AdminDashboardPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {userActivity.reviews.map((rev) => (
-                      <div key={rev.id} className="rounded-xl border border-border/60 bg-surface-soft/30 p-3 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-text flex items-center gap-1">
-                            {"★".repeat(rev.rating)} {rev.title || "Reflection"}
-                          </span>
-                          <span className="text-text-muted text-[11px]">{new Date(rev.createdAt).toLocaleDateString()}</span>
+                    {userActivity.reviews.map((rev) => {
+                      const matchedBook = books.find((b) => b.id === rev.bookId);
+                      const resolvedBookTitle = rev.bookTitle || matchedBook?.title || "Unknown Book";
+                      const resolvedBookSlug = rev.bookSlug || matchedBook?.slug;
+                      return (
+                        <div key={rev.id} className="rounded-xl border border-border/60 bg-surface-soft/30 p-3 space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span className="font-semibold text-text flex items-center gap-1.5">
+                              <span className="text-amber-500">{"★".repeat(rev.rating)}</span>
+                              <span>{rev.title || "Reflection"}</span>
+                            </span>
+                            <span className="text-text-muted text-[11px]">{new Date(rev.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                            <BookOpen className="h-3 w-3 text-primary shrink-0" />
+                            <span>Book:</span>
+                            {resolvedBookSlug ? (
+                              <Link
+                                href={`/book/${resolvedBookSlug}`}
+                                onClick={() => setSelectedUserForProfile(null)}
+                                className="font-semibold text-primary hover:underline truncate"
+                              >
+                                {resolvedBookTitle}
+                              </Link>
+                            ) : (
+                              <span className="font-semibold text-text truncate">{resolvedBookTitle}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-muted whitespace-pre-line">{rev.content}</p>
                         </div>
-                        <p className="text-xs text-text-muted whitespace-pre-line">{rev.content}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1284,7 +1178,8 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

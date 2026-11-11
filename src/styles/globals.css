@@ -270,12 +270,12 @@
   @media (min-width: 640px) { .drawer-in { animation-name: drawer-right; } }
   .drawer-in-left { animation: drawer-left .3s cubic-bezier(.22,1,.36,1) both; }
   .menu-in { animation: menu-pop .16s ease-out both; transform-origin: top left; }
-  .page-in { animation: page-in .5s cubic-bezier(.22,1,.36,1) both; }
+  .page-in { animation: page-in .35s ease-out backwards; }
   @keyframes drawer-up { from { transform: translateY(24px); opacity: 0; } }
   @keyframes drawer-right { from { transform: translateX(24px); opacity: 0; } }
   @keyframes drawer-left { from { transform: translateX(-24px); opacity: 0; } }
   @keyframes menu-pop { from { transform: scale(.96) translateY(-4px); opacity: 0; } }
-  @keyframes page-in { from { transform: translateY(8px); opacity: 0; } }
+  @keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
 }
 
 /* ------------------------------------------------------------------ */
@@ -300,6 +300,7 @@ html[data-reader-theme] body {
 }
 
 .reader-shell {
+  background-color: transparent;
   transition: background-color 300ms ease, color 300ms ease;
 }
 

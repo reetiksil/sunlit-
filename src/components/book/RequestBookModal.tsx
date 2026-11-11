@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { submitBookRequest, sendRequestOtp } from "@/services/api";
 import { BookPlus, CheckCircle2, ShieldCheck, Mail, KeyRound, ArrowRight, Loader2, X } from "lucide-react";
@@ -31,8 +32,13 @@ export function RequestBookModal({ isOpen, onClose }: RequestBookModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const isUserVerified = Boolean(user && (user.isVerified || user.role === "admin"));
 
@@ -109,7 +115,7 @@ export function RequestBookModal({ isOpen, onClose }: RequestBookModalProps) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="card w-full max-w-lg p-6 sm:p-8 space-y-5 border border-primary/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <button
@@ -292,6 +298,7 @@ export function RequestBookModal({ isOpen, onClose }: RequestBookModalProps) {
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
