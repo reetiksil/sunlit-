@@ -1,6 +1,6 @@
 import { json, requireRole, sameOriginOrReject } from "@/lib/server/guard";
 import { updateRequestStatus } from "@/lib/server/requests";
-import { sendOtpEmail } from "@/lib/server/otp";
+import { sendNotificationEmail } from "@/lib/server/otp";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +24,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const updated = await updateRequestStatus(params.id, parsed.data.status);
     // Optional notification when fulfilled
     if (parsed.data.status === "fulfilled" && updated.userEmail) {
-      void sendOtpEmail(
+      void sendNotificationEmail(
         updated.userEmail,
-        `Your requested book "${updated.title}" by ${updated.author} has been added to the library!`,
-        "register-verify"
-      );
+        `Sunlit Pages — "${updated.title}" is now available`,
+        `Your requested book "${updated.title}" by ${updated.author} has been added to the Sunlit Pages library!`
+      ).catch((err) => console.error("[BOOK REQUEST NOTIFY ERROR]", err));
     }
     return json(updated);
   } catch (err) {

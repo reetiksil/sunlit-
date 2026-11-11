@@ -3,13 +3,20 @@ import type { User } from "@/types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
 
+export interface RegisterResult {
+  user: User;
+  otpDeliveryMethod?: "smtp" | "resend" | "local";
+  otpMessage?: string;
+  otpError?: string;
+}
+
 interface AuthState {
   user: User | null;
   status: AuthStatus;
   /** Re-sync with the server session cookie (source of truth). */
   refresh: () => Promise<void>;
   login: (email: string, password: string) => Promise<User>;
-  register: (name: string, email: string, password: string) => Promise<User>;
+  register: (name: string, email: string, password: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
 
@@ -48,9 +55,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   register: async (name, email, password) => {
-    const { user } = await post<{ user: User }>("/api/auth/register", { name, email, password });
-    set({ user, status: "authenticated" });
-    return user;
+    const result = await post<RegisterResult>("/api/auth/register", { name, email, password });
+    set({ user: result.user, status: "authenticated" });
+    return result;
   },
 
   logout: async () => {

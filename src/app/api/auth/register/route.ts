@@ -22,11 +22,21 @@ export async function POST(req: Request) {
   try {
     const user = await createUser(parsed.data);
     // Dispatch initial registration verification code
+    let otpDeliveryMethod: string | undefined;
+    let otpMessage: string | undefined;
+    let otpError: string | undefined;
     try {
       const { code } = await createOtp(user.email, "register-verify");
-      await sendOtpEmail(user.email, code, "register-verify");
-    } catch {}
-    return attachSession(json({ user: toPublicUser(user) }, 201), user);
+      const result = await sendOtpEmail(user.email, code, "register-verify");
+      otpDeliveryMethod = result.deliveryMethod;
+      otpMessage = result.message;
+    } catch (otpErr) {
+      otpError = otpErr instanceof Error ? otpErr.message : "Could not dispatch verification email.";
+    }
+    return attachSession(
+      json({ user: toPublicUser(user), otpDeliveryMethod, otpMessage, otpError }, 201),
+      user
+    );
   } catch (err) {
     if (err instanceof DuplicateEmailError) return json({ error: err.message }, 409);
     console.error("register failed", err);

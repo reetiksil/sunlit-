@@ -209,7 +209,11 @@ export default function LoginPage() {
             ) : (
               <form onSubmit={handleConfirmReset} className="space-y-4">
                 <p className="text-xs text-text-muted">
-                  A verification code has been dispatched to <strong>{resetEmail}</strong>.
+                  {resetMessage || (
+                    <>
+                      A verification code has been dispatched to <strong>{resetEmail}</strong>.
+                    </>
+                  )}
                 </p>
                 <div className="field">
                   <label className="label">6-Digit OTP Code</label>

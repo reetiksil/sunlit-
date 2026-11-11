@@ -41,6 +41,8 @@ export async function POST(req: Request) {
       message: result.message,
     });
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : "Failed to dispatch verification code." }, 429);
+    const message = err instanceof Error ? err.message : "Failed to dispatch verification code.";
+    const status = message.toLowerCase().includes("too many") ? 429 : 500;
+    return json({ error: message }, status);
   }
 }

@@ -189,7 +189,7 @@ export const sendRequestOtp = (email?: string) =>
 export const getUserRequests = () => request<BookRequest[]>("/api/requests", { cache: "no-store" });
 
 export const sendVerificationOtp = (email: string) =>
-  request<{ ok: true; message: string }>("/api/auth/send-verification-otp", {
+  request<{ ok: true; deliveryMethod?: string; message: string }>("/api/auth/send-verification-otp", {
     method: "POST",
     body: JSON.stringify({ email }),
   });

@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSuccess, setOtpSuccess] = useState<string | null>(null);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
+  const [otpDeliveryMethod, setOtpDeliveryMethod] = useState<string | null>(null);
 
   const {
     register,
@@ -32,9 +33,16 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterInput) => {
     setServerError(null);
+    setOtpMessage(null);
     try {
-      await registerUser(data.name, data.email, data.password);
+      const result = await registerUser(data.name, data.email, data.password);
       setRegisteredEmail(data.email);
+      setOtpDeliveryMethod(result.otpDeliveryMethod ?? null);
+      if (result.otpError) {
+        setServerError(result.otpError);
+      } else if (result.otpMessage && result.otpDeliveryMethod === "local") {
+        setOtpMessage(result.otpMessage);
+      }
       setStep("verify");
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Could not create the account.");
@@ -69,6 +77,7 @@ export default function RegisterPage() {
     setOtpMessage(null);
     try {
       const res = await sendVerificationOtp(registeredEmail);
+      if (res.deliveryMethod) setOtpDeliveryMethod(res.deliveryMethod);
       setOtpMessage(res.message);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Failed to resend code.");
@@ -151,9 +160,20 @@ export default function RegisterPage() {
                 <Mail className="h-6 w-6" />
               </div>
               <h1 className="font-serif text-2xl font-semibold leading-tight">Verify Your Email</h1>
-              <p className="text-xs text-text-muted">
-                We sent a 6-digit confirmation code to <strong>{registeredEmail}</strong>. Please enter it below to verify your account.
-              </p>
+              {otpDeliveryMethod === "local" ? (
+                <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-3.5 py-2.5 text-left text-xs text-text">
+                  <p className="font-semibold text-amber-800 dark:text-amber-200">Email provider not configured</p>
+                  <p className="mt-0.5 text-text-muted">
+                    No SMTP or Resend credentials are set in <code className="font-mono">.env.local</code>, so the code for{" "}
+                    <strong>{registeredEmail}</strong> was written to the server terminal and{" "}
+                    <code className="font-mono">.data/otp-log.json</code>.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-text-muted">
+                  We sent a 6-digit confirmation code to <strong>{registeredEmail}</strong>. Please enter it below to verify your account.
+                </p>
+              )}
             </header>
 
             <form onSubmit={handleVerifyOtp} className="space-y-4">

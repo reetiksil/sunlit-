@@ -33,12 +33,21 @@ export async function POST(req: Request) {
       const { code } = await createOtp(email, "admin-reset");
       await sendOtpEmail(email, code, "admin-reset");
     } catch (err) {
-      return json({ error: err instanceof Error ? err.message : "Failed to dispatch verification code." }, 429);
+      const message = err instanceof Error ? err.message : "Failed to dispatch verification code.";
+      const status = message.toLowerCase().includes("too many") ? 429 : 500;
+      return json({ error: message }, status);
     }
   }
 
+  const hasEmailProvider = Boolean(
+    (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) || process.env.RESEND_API_KEY
+  );
+
   return json({
     ok: true,
-    message: "If an account matches that email, a 6-digit verification code has been dispatched.",
+    deliveryMethod: hasEmailProvider ? "email" : "local",
+    message: hasEmailProvider
+      ? "If an account matches that email, a 6-digit verification code has been dispatched."
+      : "No email provider (SMTP/Resend) is configured in .env.local. If the account exists, the code was logged to the server terminal and .data/otp-log.json.",
   });
 }

@@ -25,9 +25,11 @@ export async function POST(req: Request) {
   const email = parsed.data.email.toLowerCase();
   try {
     const { code } = await createOtp(email, "register-verify");
-    await sendOtpEmail(email, code, "register-verify");
-    return json({ ok: true, message: "Verification code sent to your email." });
+    const result = await sendOtpEmail(email, code, "register-verify");
+    return json({ ok: true, deliveryMethod: result.deliveryMethod, message: result.message });
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : "Failed to dispatch code." }, 429);
+    const message = err instanceof Error ? err.message : "Failed to dispatch code.";
+    const status = message.toLowerCase().includes("too many") ? 429 : 500;
+    return json({ error: message }, status);
   }
 }

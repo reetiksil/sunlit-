@@ -42,7 +42,7 @@ export function RequestBookModal({ isOpen, onClose }: RequestBookModalProps) {
     try {
       const res = await sendRequestOtp(emailToUse || undefined);
       setOtpRequired(true);
-      setOtpSentMsg(`A 6-digit verification code has been sent to ${res.email}. Please check your inbox.`);
+      setOtpSentMsg(res.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to dispatch verification code.");
     } finally {

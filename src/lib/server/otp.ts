@@ -127,33 +127,17 @@ export async function verifyOtpCode(
 }
 
 /**
- * Dispatch verification OTP using configured SMTP, Resend, or local mailbox fallback.
+ * Shared email dispatcher using configured SMTP, Resend, or local fallback.
  */
-export async function sendOtpEmail(
-  email: string,
-  code: string,
-  purpose: OtpPurpose
-): Promise<EmailDispatchResult> {
-  const subject =
-    purpose === "admin-reset"
-      ? "Sunlit Pages — Curator Password Reset Code"
-      : purpose === "book-request"
-      ? "Sunlit Pages — Book Request Verification Code"
-      : "Sunlit Pages — Account Verification Code";
-
-  const textMessage = `Your Sunlit Pages verification code is: ${code}\n\nThis code is valid for 10 minutes and single-use.\nIf you did not make this request, you can safely ignore this email.`;
-
-  const htmlMessage = `
-    <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; padding: 28px; background-color: #FFF9EF; color: #182230; border: 1px solid #F0E6D2; border-radius: 18px;">
-      <h2 style="font-size: 24px; color: #F6B94C; margin-top: 0;">Sunlit Pages</h2>
-      <p style="font-size: 15px; line-height: 1.6;">Hello,</p>
-      <p style="font-size: 15px; line-height: 1.6;">Your single-use verification code is:</p>
-      <div style="text-align: center; margin: 24px 0;">
-        <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 12px 24px; background: #FFFFFF; border: 2px dashed #F6B94C; border-radius: 12px; display: inline-block;">${code}</span>
-      </div>
-      <p style="font-size: 13px; color: #5C6B7C; line-height: 1.5;">This code expires in 10 minutes and can only be used once. Never share this code with anyone.</p>
-    </div>
-  `;
+async function dispatchEmail(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  localSummary: string;
+  logEntry: Record<string, unknown>;
+}): Promise<EmailDispatchResult> {
+  const { to, subject, text, html, localSummary, logEntry } = opts;
 
   // 1. Universal SMTP configuration (e.g. Gmail SMTP, SendGrid, Amazon SES)
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -164,6 +148,9 @@ export async function sendOtpEmail(
         host: process.env.SMTP_HOST,
         port,
         secure,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
@@ -172,19 +159,23 @@ export async function sendOtpEmail(
 
       await transporter.sendMail({
         from: process.env.EMAIL_FROM || `"Sunlit Pages" <${process.env.SMTP_USER}>`,
-        to: email,
+        to,
         subject,
-        text: textMessage,
-        html: htmlMessage,
+        text,
+        html,
       });
 
       return {
         dispatched: true,
         deliveryMethod: "smtp",
-        message: `A 6-digit verification code has been sent to ${email}.`,
+        message: `A 6-digit verification code has been sent to ${to}.`,
       };
     } catch (smtpErr) {
       console.error("[SMTP ERROR] Could not send email:", smtpErr);
+      if (!process.env.RESEND_API_KEY) {
+        const detail = smtpErr instanceof Error ? smtpErr.message : "Unknown SMTP error";
+        throw new Error(`Could not send email via SMTP (${detail}). Please check your SMTP settings in .env.local.`);
+      }
     }
   }
 
@@ -199,10 +190,10 @@ export async function sendOtpEmail(
         },
         body: JSON.stringify({
           from: process.env.EMAIL_FROM || "Sunlit Pages <onboarding@resend.dev>",
-          to: [email],
+          to: [to],
           subject,
-          text: textMessage,
-          html: htmlMessage,
+          text,
+          html,
         }),
       });
 
@@ -210,22 +201,27 @@ export async function sendOtpEmail(
         return {
           dispatched: true,
           deliveryMethod: "resend",
-          message: `A 6-digit verification code has been sent to ${email}.`,
+          message: `A 6-digit verification code has been sent to ${to}.`,
         };
       } else {
-        const errJson = await res.json().catch(() => ({}));
+        const errJson = (await res.json().catch(() => ({}))) as { message?: string };
         console.error("[RESEND ERROR]", errJson);
+        throw new Error(
+          `Could not send email via Resend (${errJson.message || `HTTP ${res.status}`}). Check RESEND_API_KEY and EMAIL_FROM in .env.local.`
+        );
       }
     } catch (resendErr) {
       console.error("[RESEND ERROR] Could not send email:", resendErr);
+      if (resendErr instanceof Error) throw resendErr;
+      throw new Error("Could not send email via Resend. Check RESEND_API_KEY in .env.local.");
     }
   }
 
   // 3. Local Development Mailbox Fallback (writes to terminal & .data/otp-log.json)
   console.log(`\n======================================================`);
-  console.log(`[DISPATCHED OTP]  To: ${email}`);
-  console.log(`[SUBJECT]         ${subject}`);
-  console.log(`[VERIFICATION]    ${code}`);
+  console.log(`[DISPATCHED EMAIL] To: ${to}`);
+  console.log(`[SUBJECT]          ${subject}`);
+  console.log(`[DETAILS]          ${localSummary}`);
   console.log(`======================================================\n`);
 
   try {
@@ -234,13 +230,80 @@ export async function sendOtpEmail(
     try {
       log = JSON.parse(await fs.readFile(logFile, "utf8"));
     } catch {}
-    log.push({ email, purpose, code, timestamp: new Date().toISOString() });
+    log.push({ email: to, ...logEntry, timestamp: new Date().toISOString() });
     await fs.writeFile(logFile, JSON.stringify(log.slice(-50), null, 2));
   } catch {}
 
   return {
     dispatched: true,
     deliveryMethod: "local",
-    message: `A 6-digit verification code has been sent to ${email}.`,
+    message:
+      "Email provider (SMTP or Resend) is not configured in .env.local. Code was logged locally to the server terminal and .data/otp-log.json.",
   };
+}
+
+/**
+ * Dispatch verification OTP using configured SMTP, Resend, or local mailbox fallback.
+ */
+export async function sendOtpEmail(
+  email: string,
+  code: string,
+  purpose: OtpPurpose
+): Promise<EmailDispatchResult> {
+  const subject =
+    purpose === "admin-reset"
+      ? "Sunlit Pages — Curator Password Reset Code"
+      : purpose === "book-request"
+      ? "Sunlit Pages — Book Request Verification Code"
+      : "Sunlit Pages — Account Verification Code";
+
+  const text = `Your Sunlit Pages verification code is: ${code}\n\nThis code is valid for 10 minutes and single-use.\nIf you did not make this request, you can safely ignore this email.`;
+
+  const html = `
+    <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; padding: 28px; background-color: #FFF9EF; color: #182230; border: 1px solid #F0E6D2; border-radius: 18px;">
+      <h2 style="font-size: 24px; color: #F6B94C; margin-top: 0;">Sunlit Pages</h2>
+      <p style="font-size: 15px; line-height: 1.6;">Hello,</p>
+      <p style="font-size: 15px; line-height: 1.6;">Your single-use verification code is:</p>
+      <div style="text-align: center; margin: 24px 0;">
+        <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 6px; padding: 12px 24px; background: #FFFFFF; border: 2px dashed #F6B94C; border-radius: 12px; display: inline-block;">${code}</span>
+      </div>
+      <p style="font-size: 13px; color: #5C6B7C; line-height: 1.5;">This code expires in 10 minutes and can only be used once. Never share this code with anyone.</p>
+    </div>
+  `;
+
+  return dispatchEmail({
+    to: email,
+    subject,
+    text,
+    html,
+    localSummary: code,
+    logEntry: { purpose, code },
+  });
+}
+
+/**
+ * Send a general transactional notification email (e.g., book request fulfilled).
+ */
+export async function sendNotificationEmail(
+  email: string,
+  subject: string,
+  message: string
+): Promise<EmailDispatchResult> {
+  const html = `
+    <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; padding: 28px; background-color: #FFF9EF; color: #182230; border: 1px solid #F0E6D2; border-radius: 18px;">
+      <h2 style="font-size: 24px; color: #F6B94C; margin-top: 0;">Sunlit Pages</h2>
+      <p style="font-size: 15px; line-height: 1.6;">Hello,</p>
+      <p style="font-size: 15px; line-height: 1.6;">${message}</p>
+      <p style="font-size: 13px; color: #5C6B7C; line-height: 1.5;">Warm regards,<br/>The Sunlit Pages Salon</p>
+    </div>
+  `;
+
+  return dispatchEmail({
+    to: email,
+    subject,
+    text: message,
+    html,
+    localSummary: message,
+    logEntry: { purpose: "notification", message },
+  });
 }
