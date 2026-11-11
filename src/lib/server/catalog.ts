@@ -245,9 +245,14 @@ export function upsertReview(review: Review): Promise<Review> {
 
     if (!s.reviews[bookId]) s.reviews[bookId] = [];
     const list = s.reviews[bookId];
-    const existingIndex = list.findIndex((r) => r.id === review.id || r.userId === review.userId);
+    const targetById = list.find((r) => r.id === review.id);
+    if (targetById && targetById.userId !== review.userId) {
+      throw new Error("Not authorized to edit this review.");
+    }
+    const existingIndex = list.findIndex((r) => r.userId === review.userId);
 
     if (existingIndex >= 0) {
+      review.id = list[existingIndex].id;
       review.createdAt = list[existingIndex].createdAt;
       review.updatedAt = new Date().toISOString();
       list[existingIndex] = review;
@@ -290,15 +295,21 @@ export function deleteReview(bookId: string, reviewId: string): Promise<void> {
 /* CROSS-DEVICE BOOKSHELF SYNC                                           */
 /* ===================================================================== */
 
-export async function getUserBookshelf(userId: string): Promise<UserBookshelfData> {
+export async function getUserBookshelf(
+  userId: string
+): Promise<UserBookshelfData & { initialized: boolean }> {
   const s = await load();
-  return s.userBookshelves[userId] ?? { shelf: {}, progress: {} };
+  const saved = s.userBookshelves[userId];
+  if (!saved) {
+    return { shelf: {}, progress: {}, initialized: false };
+  }
+  return { shelf: saved.shelf, progress: saved.progress, initialized: true };
 }
 
 export function saveUserBookshelf(userId: string, data: UserBookshelfData): Promise<void> {
   return mutate((s) => {
     s.userBookshelves[userId] = {
-      shelf: { ...(s.userBookshelves[userId]?.shelf ?? {}), ...data.shelf },
+      shelf: { ...data.shelf },
       progress: { ...(s.userBookshelves[userId]?.progress ?? {}), ...data.progress },
     };
   });

@@ -55,7 +55,12 @@ export const useBookshelfStore = create<BookshelfState>()(
           const res = await fetch("/api/user/bookshelf");
           if (res.ok) {
             const data = await res.json();
-            if (data && (Object.keys(data.shelf || {}).length > 0 || Object.keys(data.progress || {}).length > 0)) {
+            if (data?.initialized) {
+              set((state) => ({
+                shelf: data.shelf || {},
+                progress: { ...state.progress, ...(data.progress || {}) },
+              }));
+            } else if (data && (Object.keys(data.shelf || {}).length > 0 || Object.keys(data.progress || {}).length > 0)) {
               set((state) => ({
                 shelf: { ...state.shelf, ...data.shelf },
                 progress: { ...state.progress, ...data.progress },

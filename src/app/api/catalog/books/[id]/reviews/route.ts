@@ -35,6 +35,16 @@ export async function POST(
   const parsed = reviewSchema.safeParse(body);
   if (!parsed.success) return json({ error: parsed.error.issues[0].message }, 400);
 
+  if (!parsed.data.id) {
+    const existing = await listReviews(params.id);
+    if (existing.some((r) => r.userId === user.id)) {
+      return json(
+        { error: "You have already submitted a review for this book. Please edit your existing review instead." },
+        409
+      );
+    }
+  }
+
   try {
     const review = await upsertReview({
       id: parsed.data.id || `rev-${randomUUID()}`,
