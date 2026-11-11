@@ -156,6 +156,7 @@ export default function BookshelfPage() {
                       title={book.title}
                       author={book.author}
                       styleConfig={book.coverStyle}
+                      coverImageUrl={book.coverImageUrl}
                     />
                   </div>
                   <div>

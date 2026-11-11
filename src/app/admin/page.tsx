@@ -373,7 +373,7 @@ export default function AdminDashboardPage() {
           <p className="text-xs text-text-muted">Publish literature, manage chapters, and fulfill reader acquisition requests.</p>
         </div>
 
-        <div className="flex rounded-2xl border border-border bg-surface p-1 shadow-sm">
+        <div className="flex flex-wrap rounded-2xl border border-border bg-surface p-1 shadow-sm gap-1">
           {(
             [
               { id: "overview", label: "Overview" },
@@ -698,7 +698,7 @@ export default function AdminDashboardPage() {
                     ...books.map((b) => ({
                       value: b.id,
                       label: b.title,
-                      description: b.author,
+                      sublabel: b.author,
                     })),
                   ]}
                 />
@@ -827,7 +827,11 @@ export default function AdminDashboardPage() {
                           setEditingChapterId(ch.id);
                           setChapterTitle(ch.title);
                           setChapterNumber(ch.number);
-                          editor?.commands.setContent(ch.content.map((p) => `<p>${p}</p>`).join(""));
+                          const escapeHtml = (s: string) =>
+                            s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                          editor?.commands.setContent(
+                            ch.content.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br />")}</p>`).join("")
+                          );
                         }}
                         className="p-1 text-text-muted hover:text-text rounded"
                         title="Edit Chapter"

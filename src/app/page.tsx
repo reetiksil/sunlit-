@@ -158,7 +158,11 @@ export default function HomePage() {
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2 md:justify-start">
                 <Link
-                  href={`/book/${featuredBooks[activeSlide].slug}/chapter/1`}
+                  href={
+                    featuredBooks[activeSlide].chapterCount > 0
+                      ? `/book/${featuredBooks[activeSlide].slug}/chapter/1`
+                      : `/book/${featuredBooks[activeSlide].slug}`
+                  }
                   className="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-fg shadow-sm hover:brightness-105 active:scale-[0.98]"
                 >
                   <BookOpen className="h-4 w-4" />
@@ -353,7 +357,11 @@ export default function HomePage() {
               >
                 <div className="min-w-0">
                   <Link
-                    href={`/book/${book.slug}/chapter/${book.chapterCount}`}
+                    href={
+                      book.chapterCount > 0
+                        ? `/book/${book.slug}/chapter/${book.chapterCount}`
+                        : `/book/${book.slug}`
+                    }
                     className="truncate font-serif text-base font-medium text-text hover:text-primary block"
                   >
                     {book.title}

@@ -215,9 +215,11 @@ function BrowseContent() {
       <ContinueReadingShelf />
 
       {/* Redesigned Royal Filter Salon Panel */}
-      <div className="card p-6 sm:p-7 border border-primary/25 bg-gradient-to-b from-surface via-surface to-surface-soft/30 shadow-md space-y-6 relative overflow-hidden">
+      <div className="card p-6 sm:p-7 border border-primary/25 bg-gradient-to-b from-surface via-surface to-surface-soft/30 shadow-md space-y-6 relative">
         {/* Subtle decorative gold filigree corner accent */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-radial from-primary/10 to-transparent pointer-events-none" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-radial from-primary/10 to-transparent" />
+        </div>
 
         {/* Search Bar */}
         <div className="relative">
@@ -337,7 +339,7 @@ function BrowseContent() {
           aria-label="Filter Books"
           className="fixed inset-0 z-50 flex flex-col justify-end bg-black/50 sm:hidden backdrop-blur-xs"
         >
-          <div className="rounded-t-3xl border-t border-border bg-surface p-6 space-y-6 shadow-2xl">
+          <div className="rounded-t-3xl border-t border-border bg-surface p-6 pb-20 space-y-6 shadow-2xl max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <h2 className="font-serif text-lg font-semibold">Filter Salon</h2>
               <button
